@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titre %}Dispositif d'alerte précoce{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/tabler.min.css') }}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230D3863'/%3E%3Cpath d='M8 21l5-6 4 4 7-9' stroke='%23F7FFBD' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+<div class="coque" id="coque">
+
+  {# ---- rail lateral : trois destinations, deconnexion en bas ---- #}
+  <nav class="rail" aria-label="Navigation principale">
+    <span class="lueurs" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="filaments" aria-hidden="true">
+      <svg class="f1" viewBox="0 0 100 400" preserveAspectRatio="none">
+        <path class="halo" d="M26 0 C42 25 42 75 26 100 C10 125 10 175 26 200 C42 225 42 275 26 300 C10 325 10 375 26 400"
+              fill="none" stroke="#E3C470" stroke-width="3.6" stroke-opacity=".4" vector-effect="non-scaling-stroke"/>
+        <path class="vif" d="M26 0 C42 25 42 75 26 100 C10 125 10 175 26 200 C42 225 42 275 26 300 C10 325 10 375 26 400"
+              fill="none" stroke="#FFD987" stroke-width="1.2" stroke-opacity=".7" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <svg class="f2" viewBox="0 0 100 400" preserveAspectRatio="none">
+        <path class="halo" d="M58 0 C36 25 36 75 58 100 C80 125 80 175 58 200 C36 225 36 275 58 300 C80 325 80 375 58 400"
+              fill="none" stroke="#E3C470" stroke-width="3.2" stroke-opacity=".32" vector-effect="non-scaling-stroke"/>
+        <path class="vif" d="M58 0 C36 25 36 75 58 100 C80 125 80 175 58 200 C36 225 36 275 58 300 C80 325 80 375 58 400"
+              fill="none" stroke="#FFD987" stroke-width="1" stroke-opacity=".58" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <svg class="f3" viewBox="0 0 100 400" preserveAspectRatio="none">
+        <path class="halo" d="M84 0 C72 25 72 75 84 100 C96 125 96 175 84 200 C72 225 72 275 84 300 C96 325 96 375 84 400"
+              fill="none" stroke="#E3C470" stroke-width="2.8" stroke-opacity=".28" vector-effect="non-scaling-stroke"/>
+        <path class="vif" d="M84 0 C72 25 72 75 84 100 C96 125 96 175 84 200 C72 225 72 275 84 300 C96 325 96 375 84 400"
+              fill="none" stroke="#FFD987" stroke-width=".95" stroke-opacity=".52" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </span>
+    <span class="scrim" aria-hidden="true"></span>
+    <span class="filet" aria-hidden="true"></span>
+
+    <div class="marque-rail">
+      <span class="sceau">
+        <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 17l5-6 4 4 7-9" stroke="#F7FFBD" stroke-width="2.7" fill="none"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="marque">Alerte précoce</span>
+    </div>
+
+    <a class="lien {{ 'actif' if actif == 'tableau' }}" href="{{ url_for('tableau.page') }}"
+       {{ 'aria-current=page' | safe if actif == 'tableau' }}>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/>
+        <rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>
+      <span class="mot">Tableau de bord</span><span class="bulle">Tableau de bord</span>
+    </a>
+    <a class="lien {{ 'actif' if actif == 'saisie' }}" href="{{ url_for('saisie.page') }}"
+       {{ 'aria-current=page' | safe if actif == 'saisie' }}>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="8" r="3.4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+      <span class="mot">Saisie individuelle</span><span class="bulle">Saisie individuelle</span>
+    </a>
+    <a class="lien {{ 'actif' if actif == 'import' }}" href="{{ url_for('import_csv.page') }}"
+       {{ 'aria-current=page' | safe if actif == 'import' }}>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      <span class="mot">Import CSV</span><span class="bulle">Import CSV</span>
+    </a>
+
+    <div class="separateur"></div>
+
+    <a class="lien pousse" href="{{ url_for('auth.deconnexion') }}">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/>
+        <path d="M18 15l3-3-3-3"/><path d="M21 12H9"/></svg>
+      <span class="mot">Se déconnecter</span><span class="bulle">Se déconnecter</span>
+    </a>
+    <button class="lien replier" type="button" id="replier" aria-label="Déplier la navigation">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      <span class="mot">Replier</span><span class="bulle">Déplier</span>
+    </button>
+  </nav>
+
+  <main class="contenu">
+    <header class="barre-contexte">
+      <div class="fil">
+        <span class="vignette" aria-hidden="true">{% block vignette %}{% endblock %}</span>
+        <h1>{% block entete %}{% endblock %}</h1>
+      </div>
+      {% block contexte %}{% endblock %}
+    </header>
+    <div class="ecrans">
+      {% block contenu %}{% endblock %}
+    </div>
+  </main>
+</div>
+
+<div class="voile-chargement" data-role="voile" aria-live="polite">
+  <div class="bloc-chargement">
+    <svg class="anneau" viewBox="0 0 50 50" aria-hidden="true">
+      <circle class="piste" cx="25" cy="25" r="20"></circle>
+      <circle class="arc" cx="25" cy="25" r="20"></circle>
+    </svg>
+    <div class="texte" data-role="texte-chargement">Calcul en cours</div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='vendor/tabler.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/effets.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

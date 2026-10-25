@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block titre %}Import CSV · Alerte précoce{% endblock %}
+{% block entete %}Import CSV{% endblock %}
+{% block vignette %}
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+     stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+{% endblock %}
+
+{% block contexte %}
+<span class="barre-sep" aria-hidden="true"></span>
+<ol class="etapes" id="etapes">
+  <li data-etape="1" aria-current="step"><span class="pastille-etape">1</span>Déposer le fichier</li>
+  <li data-etape="2"><span class="pastille-etape">2</span>Associer les colonnes</li>
+  <li data-etape="3"><span class="pastille-etape">3</span>Résultats</li>
+</ol>
+<span class="pousse-droite"></span>
+
+{# compte rendu de l'import : il vit dans la barre pour que le bloc d'analyse
+   garde exactement la meme place que sur le tableau de bord #}
+<div id="compte-rendu" class="compte-rendu" hidden>
+  <span class="etat-mode"><span class="point" aria-hidden="true"></span><span id="resume"></span></span>
+  <div class="menu" id="menu-avertissements" hidden>
+    <button class="bouton" type="button" id="bouton-avertissements" aria-expanded="false">Lignes ignorées</button>
+    <div class="liste-menu" id="panneau-avertissements" style="width:420px; padding:12px">
+      <div id="avertissements" class="small"></div>
+    </div>
+  </div>
+  <a id="lien-tableau" class="bouton" href="#">Ouvrir dans le tableau de bord</a>
+  <button class="bouton plein" type="button" id="nouvel-import">Importer un autre fichier</button>
+</div>
+
+<a class="bouton" id="lien-exemple" href="{{ url_for('import_csv.exemple') }}">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 4v12"/><path d="M8 12l4 4 4-4"/><path d="M4 20h16"/></svg>
+  <span class="mot-bouton">Fichier d'exemple</span>
+</a>
+<a class="bouton" id="lien-gabarit" href="{{ url_for('import_csv.gabarit') }}"><span class="mot-bouton">Gabarit vierge</span></a>
+{% endblock %}
+
+{% block contenu %}
+<section class="ecran" id="assistant-import">
+  <div class="zone-import">
+
+    {# ---- étape 1 : le fichier ---- #}
+    <div class="panneau-etape" id="etape-1">
+      <div class="depot" id="depot">
+        <input type="file" id="fichier" accept=".csv,text/csv" aria-label="Fichier CSV des étudiants">
+        <span class="cercle-depot" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        </span>
+        <p class="titre-depot">Déposez votre fichier ici</p>
+        <p class="texte-depot">ou cliquez pour le choisir · fichier CSV, séparateur point-virgule ou virgule</p>
+        <p class="nom-depose" data-role="nom-fichier" hidden></p>
+      </div>
+
+      <div class="card">
+        <div class="card-body d-flex flex-wrap align-items-end gap-3">
+          <div style="flex:1 1 280px; min-width:0">
+            <label class="form-label" for="nom">Nom de la cohorte <span class="text-secondary fw-normal">(facultatif)</span></label>
+            <input type="text" id="nom" class="form-control" placeholder="ex. Promotion 2025, Libreville">
+          </div>
+          <button id="btn-analyser" class="bouton plein" type="button" style="height:38px">Analyser le fichier</button>
+        </div>
+        <div id="erreur" class="alert alert-danger m-3 mt-0" role="alert" hidden style="white-space: pre-line;"></div>
+      </div>
+
+      <div class="trio-infos">
+        <div class="info"><span class="num-info">1</span>
+          <b>Une ligne par étudiant</b>
+          <span>Une colonne de référence permet de retrouver chacun dans le tableau de bord.</span></div>
+        <div class="info"><span class="num-info">2</span>
+          <b>Les en-têtes peuvent différer</b>
+          <span>Une étape d'association vous laisse désigner la colonne qui correspond à chaque champ.</span></div>
+        <div class="info"><span class="num-info">3</span>
+          <b>Les colonnes manquantes sont estimées</b>
+          <span>À partir des étudiants au profil le plus proche, et la fiche le signale.</span></div>
+      </div>
+    </div>
+
+    {# ---- étape 2 : l'association des colonnes ---- #}
+    <div class="panneau-etape" id="bloc-mapping" hidden>
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Associer les colonnes</h3>
+          <span class="ms-auto small text-secondary" id="fichier-lu"></span></div>
+        <div class="card-body">
+          <p class="text-secondary small">Indiquez la colonne de votre fichier qui correspond à chaque champ.
+             Laissez « Aucune correspondance » si elle n'existe pas : la valeur sera estimée.</p>
+          <div class="alert alert-info small" id="info-non-reconnues" hidden>
+            <div>Colonnes non reconnues : <span id="liste-non-reconnues"></span>.</div></div>
+          <div class="row g-2" id="lignes-mapping"></div>
+          <details class="mt-3" id="bloc-supplementaires">
+            <summary class="fw-medium" style="cursor: pointer;">Champs supplémentaires (<span id="nb-supplementaires">23</span>)</summary>
+            <p class="text-secondary small mt-2">À renseigner seulement si votre fichier les contient ; sinon laissez « Aucune correspondance ».</p>
+            <div class="row g-2" id="lignes-supplementaires"></div>
+          </details>
+        </div>
+        <div class="card-footer d-flex gap-2 justify-content-end">
+          <button id="btn-retour" class="bouton" type="button">Changer de fichier</button>
+          <button id="btn-confirmer" class="bouton plein" type="button">Confirmer et calculer</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+{% include "_cohorte.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/resultat.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cohorte.js') }}"></script>
+<script src="{{ url_for('static', filename='js/import.js') }}"></script>
+{% endblock %}

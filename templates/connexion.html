@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Connexion · Alerte précoce</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230D3863'/%3E%3Cpath d='M8 21l5-6 4 4 7-9' stroke='%23F7FFBD' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/connexion.css') }}">
+</head>
+<body class="page-connexion{{ ' avec-image' if fond }}"
+      {% if fond %}style="--image-fond:url('{{ fond }}'); --voile-fond:{{ voile / 100 }};"{% endif %}>
+
+<div class="fond" id="fond" aria-hidden="true"><canvas id="aurore"></canvas></div>
+<div class="halos" aria-hidden="true"><i class="halo halo-a"></i><i class="halo halo-b"></i><i class="halo halo-c"></i></div>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="scene">
+  <div class="carte" id="carte">
+
+    <div class="face face-avant">
+      <section class="volet-gauche">
+        <span class="lisere" aria-hidden="true"></span>
+        <span class="lueur-douce" id="lueur-gauche" aria-hidden="true"></span>
+        <div class="filigrane" aria-hidden="true">
+          <svg viewBox="0 0 420 120" preserveAspectRatio="none">
+            <defs><linearGradient id="sous-courbe" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#3281E0" stop-opacity=".5"/>
+              <stop offset="100%" stop-color="#3281E0" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0 96 C 40 92, 62 78, 96 74 S 150 86, 186 66 S 240 28, 282 36 S 346 16, 420 8 L 420 120 L 0 120 Z"
+                  fill="url(#sous-courbe)"/>
+            <path d="M0 96 C 40 92, 62 78, 96 74 S 150 86, 186 66 S 240 28, 282 36 S 346 16, 420 8"
+                  fill="none" stroke="#0D3863" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="282" cy="36" r="3.4" fill="#D8B85C"/>
+          </svg>
+        </div>
+
+        <div class="marque">
+          <span class="sceau">
+            <span class="blob"></span>
+            <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 17l5-6 4 4 7-9" stroke="#F7FFBD" stroke-width="2.6" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          Alerte précoce
+        </div>
+
+        <div class="centre">
+          <h1 class="chapo">Content de vous revoir</h1>
+          <p class="sous">Connectez-vous pour reprendre le suivi du risque d'abandon.</p>
+
+          {% if erreur %}
+          <div class="alerte" role="alert">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16.2v.1"></path>
+            </svg>
+            {{ erreur }}
+          </div>
+          {% endif %}
+
+          <form method="post" autocomplete="off" id="formulaire-connexion">
+            <div class="champ">
+              <input type="text" id="identifiant" name="identifiant" placeholder=" " required autofocus>
+              <label for="identifiant">Identifiant</label>
+              <span class="marque-champ" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="8" r="3.4"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg>
+              </span>
+            </div>
+            <div class="champ">
+              <input type="password" id="mot_de_passe" name="mot_de_passe" placeholder=" " required>
+              <label for="mot_de_passe">Mot de passe</label>
+              <span class="marque-champ" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="5" y="11" width="14" height="9" rx="2"></rect>
+                  <path d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11"></path></svg>
+              </span>
+              <button type="button" class="oeil" id="oeil" aria-label="Afficher le mot de passe">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" id="oeil-ouvert">
+                  <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" id="oeil-ferme" hidden>
+                  <path d="M3 3l18 18"></path>
+                  <path d="M10.6 5.1A9.7 9.7 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4"></path>
+                  <path d="M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"></path>
+                </svg>
+              </button>
+            </div>
+            <button type="submit" class="valider" id="valider">
+              <span class="reflet"></span>
+              <span class="mot">Se connecter</span>
+              <svg class="anneau" viewBox="0 0 32 32" aria-hidden="true">
+                <circle class="piste" cx="16" cy="16" r="13"></circle>
+                <circle class="arc" cx="16" cy="16" r="13"></circle>
+              </svg>
+              <svg class="coche" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12.5l4.6 4.6L19 7.5"></path>
+              </svg>
+            </button>
+          </form>
+
+          <p class="assurance">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3l7 3v5.5c0 4.2-2.9 7.9-7 9.5-4.1-1.6-7-5.3-7-9.5V6z"></path>
+              <path d="M9.2 12.2l2 2 3.6-4"></path></svg>
+            Les données des étudiants ne quittent pas le serveur de l'établissement.
+          </p>
+        </div>
+
+        <p class="pied">
+          <span><span class="pastille-or"></span>Accès réservé aux conseillers</span>
+          <span class="version">Alerte précoce · 2026</span>
+        </p>
+      </section>
+
+      <aside class="volet-droit" id="volet">
+        <div class="champ-donnees" id="particules" aria-hidden="true"></div>
+        <div class="pile" id="pile" aria-hidden="true"></div>
+        <div class="recit" id="recit"><h2></h2><p></p></div>
+        <div class="rail" id="rail" role="tablist" aria-label="Présentation du dispositif"></div>
+      </aside>
+    </div>
+
+  </div>
+</div>
+
+<p class="avis-perf" id="avis-perf" hidden></p>
+
+<script src="{{ url_for('static', filename='js/connexion.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+/* ==================================================================
+   Page de connexion. Feuille autonome : cette page ne charge ni Tabler
+   ni app.css, elle n'a besoin de rien d'autre. Les polices sont servies
+   depuis static/vendor/fonts, comme partout ailleurs dans l'application.
+================================================================== */
+@font-face { font-family:'Inter'; font-style:normal; font-weight:400; font-display:swap;
+  src:url('../vendor/fonts/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family:'Inter'; font-style:normal; font-weight:500; font-display:swap;
+  src:url('../vendor/fonts/inter-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family:'Inter'; font-style:normal; font-weight:600; font-display:swap;
+  src:url('../vendor/fonts/inter-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family:'Space Grotesk'; font-style:normal; font-weight:500; font-display:swap;
+  src:url('../vendor/fonts/space-grotesk-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family:'Space Grotesk'; font-style:normal; font-weight:700; font-display:swap;
+  src:url('../vendor/fonts/space-grotesk-latin-700-normal.woff2') format('woff2'); }
+
+/* Mise en page : une carte unique qui flotte en 3D au-dessus d'une aurore WebGL ;
+   le formulaire a gauche sur verre clair, les donnees a droite sur verre nuit. */
+:root {
+  --nuit:#04172C; --bleu-profond:#0D3863; --bleu:#3281E0; --bleu-vif:#5FA8FF;
+  --or:#D8B85C; --or-clair:#F6E7B4; --jaune:#F7FFBD;
+  --encre:#0B1626; --ardoise:#5C6B7E; --brume:#F2F6FB;
+  --verre-clair:rgba(255,255,255,.96); --verre-nuit:rgba(5,24,48,.82);
+  --display:'Space Grotesk', 'Trebuchet MS', sans-serif;
+  --texte:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+html, body { height:100%; }
+body { margin:0; background:var(--nuit); color:#fff; font-family:var(--texte);
+  overflow:hidden; -webkit-font-smoothing:antialiased; }
+
+/* Le shader ne dessine qu'une image, en basse definition, etiree par le navigateur.
+   Le mouvement vient d'une transformation CSS, que le compositeur applique sans
+   rien recalculer : le GPU n'a plus de travail en continu. */
+/* L'aurore ondule vraiment : le shader tourne en continu, mais sur une toile
+   de 400 pixels de large que le navigateur etire. Une aurore est floue par
+   nature, l'etirement ne se voit pas, et le GPU calcule cinquante fois moins
+   de pixels qu'en pleine definition. */
+.fond { position:fixed; inset:0; z-index:0; overflow:hidden; background:#04172C; }
+.fond canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+/* Le mouvement du fond : des halos deja flous que le GPU se contente de deplacer.
+   Aucun flou n'est recalcule, aucune image n'est redessinee. */
+.halos { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.halo { position:absolute; border-radius:50%; filter:blur(90px); will-change:transform; }
+.halo-a { width:52vw; height:52vw; background:#3281E0; top:-18%; left:-14%; opacity:.5;
+  animation:derive-a 23s ease-in-out infinite alternate; }
+.halo-b { width:42vw; height:42vw; background:#F6E7B4; bottom:-18%; right:-10%; opacity:.2;
+  animation:derive-b 29s ease-in-out infinite alternate; }
+.halo-c { width:40vw; height:40vw; background:#5FA8FF; top:44%; left:38%; opacity:.3;
+  animation:derive-c 25s ease-in-out infinite alternate; }
+@keyframes derive-a { to { transform:translate3d(26%, 20%, 0) scale(1.26); } }
+@keyframes derive-b { to { transform:translate3d(-24%, -18%, 0) scale(1.2); } }
+@keyframes derive-c { to { transform:translate3d(-28%, 16%, 0) scale(.8); } }
+body.econome .halo { animation:none; }
+body.econome .lisere { animation:none; }
+
+body.econome .grain { display:none; }
+.grain { position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.1;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E"); }
+
+/* ---------- scene 3D ---------- */
+.scene { position:relative; z-index:2; height:100%; display:flex; align-items:center;
+  justify-content:center; padding:24px 16px; perspective:1500px; }
+.carte { position:relative; width:min(1080px,100%); height:min(640px,86vh);
+  transform-style:preserve-3d; transition:transform .5s cubic-bezier(.2,.8,.3,1);
+  will-change:transform; }
+.face { position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.06fr);
+  border-radius:28px; overflow:hidden; backface-visibility:hidden; transform-style:preserve-3d;
+  box-shadow:0 50px 110px rgba(1,10,24,.62), 0 0 0 1px rgba(255,255,255,.14),
+             inset 0 1px 0 rgba(255,255,255,.3); }
+
+/* ---------- volet formulaire ---------- */
+.volet-gauche { position:relative; overflow:hidden; background:var(--verre-clair);
+  color:var(--encre); display:flex; flex-direction:column; padding:30px 42px 24px; }
+/* un quadrillage de papier millimetre, presque invisible, qui s'efface vers le bas */
+.volet-gauche::before { content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:linear-gradient(rgba(13,56,99,.055) 1px, transparent 1px),
+                   linear-gradient(90deg, rgba(13,56,99,.055) 1px, transparent 1px);
+  background-size:30px 30px;
+  -webkit-mask:linear-gradient(170deg, #000 0%, rgba(0,0,0,.35) 38%, transparent 72%);
+  mask:linear-gradient(170deg, #000 0%, rgba(0,0,0,.35) 38%, transparent 72%); }
+/* une lueur deplacee par le compositeur, jamais redessinee */
+.lueur-douce { position:absolute; top:0; left:0; width:360px; height:360px; pointer-events:none;
+  margin:-180px 0 0 -180px; opacity:0; transition:opacity .5s; will-change:transform;
+  background:radial-gradient(circle, rgba(50,129,224,.1) 0%, rgba(216,184,92,.05) 42%, transparent 68%); }
+.volet-gauche:hover .lueur-douce { opacity:1; }
+body.econome .lueur-douce { display:none; }
+/* la courbe d'un score de risque, en filigrane */
+.filigrane { position:absolute; left:0; right:0; bottom:38px; height:108px; pointer-events:none;
+  opacity:.085; }
+.filigrane svg { width:100%; height:100%; display:block; }
+.lisere { position:absolute; inset:14px; border-radius:18px; pointer-events:none; padding:1.4px;
+  background:linear-gradient(135deg,#A8822F,var(--or-clair) 26%,var(--or) 48%,
+    rgba(216,184,92,.2) 62%,var(--or-clair) 82%,#A8822F);
+  background-size:260% 260%; animation:or 12s ease-in-out infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite:exclude; }
+@keyframes or { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+
+.marque { display:flex; align-items:center; gap:10px; position:relative; z-index:1;
+  font-family:var(--display); font-weight:700; letter-spacing:-.02em; color:var(--bleu-profond); }
+.sceau { position:relative; width:34px; height:34px; display:grid; place-items:center; }
+.sceau svg { position:relative; z-index:1; }
+.sceau .blob { position:absolute; inset:-5px; border-radius:42% 58% 54% 46% / 48% 44% 56% 52%;
+  background:linear-gradient(135deg,var(--bleu),var(--bleu-vif)); filter:blur(.5px);
+  animation:morphose 9s ease-in-out infinite; }
+body.econome .sceau .blob { animation:none; }
+@keyframes morphose {
+  0%,100% { border-radius:42% 58% 54% 46% / 48% 44% 56% 52%; transform:rotate(0deg) scale(1); }
+  33% { border-radius:58% 42% 38% 62% / 56% 60% 40% 44%; transform:rotate(60deg) scale(1.05); }
+  66% { border-radius:36% 64% 62% 38% / 42% 52% 48% 58%; transform:rotate(-40deg) scale(.97); }
+}
+
+.centre { margin:auto; width:100%; max-width:332px; position:relative; z-index:1; }
+.chapo { font-family:var(--display); font-size:1.62rem; font-weight:700; letter-spacing:-.03em;
+  margin:0 0 6px; text-wrap:balance; }
+.sous { margin:0 0 24px; color:var(--ardoise); font-size:.92rem; line-height:1.5; }
+
+.champ { position:relative; margin-bottom:14px; }
+.champ input { width:100%; height:52px; padding:20px 14px 7px 42px; font:500 .95rem var(--texte);
+  color:var(--encre); background:#fff; border:1px solid #D9E1EA; border-radius:13px;
+  outline:none; transition:border-color .2s, box-shadow .2s; }
+.champ input:focus { border-color:var(--or); box-shadow:0 0 0 4px rgba(216,184,92,.17); }
+.champ label { position:absolute; left:42px; top:16px; font-size:.92rem; color:var(--ardoise);
+  pointer-events:none; transform-origin:left top; transition:transform .18s cubic-bezier(.2,.8,.3,1), color .18s; }
+.champ input:focus + label, .champ input:not(:placeholder-shown) + label {
+  transform:translateY(-9px) scale(.76); color:#7A6428; }
+.champ .marque-champ { position:absolute; left:14px; top:50%; transform:translateY(-50%);
+  color:#9AA8B8; pointer-events:none; line-height:0; transition:color .18s; }
+.champ input:focus ~ .marque-champ { color:var(--or); }
+.champ .oeil { position:absolute; right:8px; top:50%; transform:translateY(-50%); border:0;
+  background:none; color:#8A98A8; width:34px; height:34px; border-radius:9px; cursor:pointer;
+  display:grid; place-items:center; transition:background .15s, color .15s; }
+.champ .oeil:hover { background:#EEF2F7; color:var(--bleu-profond); }
+
+/* bouton qui se morphe en anneau puis en coche */
+.valider { position:relative; width:100%; height:52px; margin-top:8px; border:0; cursor:pointer;
+  border-radius:13px; background:var(--bleu-profond); color:#fff; overflow:hidden;
+  font:600 .96rem var(--texte); letter-spacing:.01em;
+  box-shadow:0 10px 26px rgba(13,56,99,.3);
+  transition:width .5s cubic-bezier(.76,0,.24,1), border-radius .5s cubic-bezier(.76,0,.24,1),
+             margin-left .5s cubic-bezier(.76,0,.24,1), background .3s, box-shadow .25s; }
+.valider:hover { background:#154A80; box-shadow:0 14px 32px rgba(13,56,99,.38); }
+.valider .mot { display:block; transition:opacity .2s; }
+.valider .reflet { position:absolute; top:0; left:-120%; width:50%; height:100%;
+  background:linear-gradient(100deg,transparent,rgba(246,231,180,.42),transparent); transition:left .7s ease; }
+.valider:hover .reflet { left:170%; }
+.valider.charge { width:52px; margin-left:calc(50% - 26px); border-radius:50%; }
+.valider.charge .mot { opacity:0; }
+.valider .anneau { position:absolute; inset:0; margin:auto; width:26px; height:26px; opacity:0;
+  transition:opacity .2s .25s; }
+.valider.charge .anneau { opacity:1; }
+.valider .anneau circle { fill:none; stroke-width:3; stroke-linecap:round; }
+.valider .anneau .piste { stroke:rgba(255,255,255,.22); }
+.valider .anneau .arc { stroke:var(--or-clair); stroke-dasharray:46 110; transform-origin:center;
+  animation:tourne 1s linear infinite; }
+@keyframes tourne { to { transform:rotate(360deg); } }
+.valider.fini { background:#1E6F4C; }
+.valider .coche { position:absolute; inset:0; margin:auto; width:24px; height:24px; opacity:0;
+  transition:opacity .2s; }
+.valider.fini .coche { opacity:1; }
+.valider.fini .anneau { opacity:0; transition:opacity .15s; }
+.valider .coche path { fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;
+  stroke-dasharray:30; stroke-dashoffset:30; }
+.valider.fini .coche path { animation:trace .4s .1s forwards cubic-bezier(.65,0,.35,1); }
+@keyframes trace { to { stroke-dashoffset:0; } }
+
+.assurance { position:relative; z-index:1; display:flex; align-items:center; gap:9px;
+  margin:18px auto 0; max-width:332px; padding:10px 13px; border-radius:12px;
+  background:linear-gradient(135deg, rgba(50,129,224,.07), rgba(216,184,92,.07));
+  border:1px solid rgba(13,56,99,.08); font-size:.78rem; line-height:1.4; color:#5A6B7E; }
+.assurance svg { flex:none; color:var(--bleu-profond); }
+.pied { margin:0; position:relative; z-index:1; display:flex; align-items:center;
+  justify-content:space-between; gap:10px; font-size:.76rem; color:#60707F;
+  padding-top:14px; border-top:1px solid rgba(13,56,99,.07); }
+.pied .version { font-variant-numeric:tabular-nums; letter-spacing:.02em; color:#60707F; }
+.pied .pastille-or { display:inline-block; width:5px; height:5px; border-radius:50%;
+  background:var(--or); margin-right:7px; vertical-align:middle; }
+
+/* ---------- volet donnees ---------- */
+.volet-droit { position:relative; overflow:hidden;
+  background:linear-gradient(152deg, rgba(4,20,42,.9) 0%, var(--verre-nuit) 52%, rgba(26,78,142,.76) 100%);
+  border-left:1px solid rgba(255,255,255,.12); transform-style:preserve-3d; }
+.volet-droit::after { content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(420px circle at var(--mx,60%) var(--my,35%),
+    rgba(246,231,180,.14), transparent 62%); transition:background .2s; }
+.pile { position:absolute; inset:28px 28px 92px; transform-style:preserve-3d; }
+.bulle { position:absolute; color:#fff; border-radius:18px; padding:15px 17px;
+  background:linear-gradient(145deg, rgba(255,255,255,.17), rgba(255,255,255,.09));
+  border:1px solid rgba(255,255,255,.24);
+  box-shadow:0 20px 48px rgba(2,14,32,.34), inset 0 1px 0 rgba(255,255,255,.28);
+  opacity:0; transform:translateZ(0) scale(.94); pointer-events:none; will-change:transform;
+  transition:opacity .55s ease, transform .75s cubic-bezier(.2,.8,.3,1); }
+
+.bulle.vue { opacity:1; }
+.b1 { top:0; left:0; width:74%; }
+.b2 { top:38%; right:-2%; width:62%; }
+.b3 { top:72%; left:5%; width:58%; display:flex; align-items:flex-start; gap:10px; }
+/* flottement : une translation, rien de plus */
+.bulle.vue { animation:flotte 7.5s ease-in-out infinite; }
+.b2.vue { animation-delay:.9s; animation-duration:8.6s; }
+.b3.vue { animation-delay:1.7s; animation-duration:7.9s; }
+@keyframes flotte { 50% { translate:0 -9px; } }
+body.econome .bulle.vue { animation:none; }
+.bulle .ligne { display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-size:.78rem; color:rgba(255,255,255,.82); }
+.bulle .nombre { font-family:var(--display); font-weight:700; font-size:1.9rem; letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums; line-height:1.12; }
+.bulle .nombre.petit { font-size:1.5rem; }
+.bulle .note { font-size:.73rem; color:rgba(255,255,255,.68); line-height:1.38; margin-top:5px; }
+.etiq { border-radius:999px; padding:2px 10px; font-size:.7rem; font-weight:600; white-space:nowrap;
+  background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.26); }
+.etiq.chaud { background:rgba(255,138,138,.26); border-color:rgba(255,160,160,.42); color:#FFD9D9; }
+.etiq.or { background:rgba(246,231,180,.2); border-color:rgba(246,231,180,.44); color:var(--or-clair); }
+.jauge { height:6px; border-radius:999px; background:rgba(255,255,255,.2); margin:9px 0 2px; overflow:hidden; }
+.jauge i { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#F59F00,#D63939); }
+.jauge.froide i { background:linear-gradient(90deg,var(--bleu-vif),var(--bleu)); }
+.puce { width:9px; height:9px; border-radius:50%; background:#6FDC8C; flex:none; margin-top:5px;
+  box-shadow:0 0 0 4px rgba(111,220,140,.18); }
+.puce.or { background:var(--or-clair); box-shadow:0 0 0 4px rgba(216,184,92,.2); }
+.duo { display:flex; gap:20px; }
+.duo > div { flex:1; }
+.duo .mini { font-size:.74rem; color:rgba(255,255,255,.76); }
+
+.recit { position:absolute; left:28px; right:28px; bottom:54px; z-index:3;
+  transform:translateZ(26px); }
+.recit h2 { font-family:var(--display); font-size:1.46rem; font-weight:700; letter-spacing:-.03em;
+  margin:0 0 7px; text-wrap:balance; }
+.recit p { margin:0; font-size:.9rem; line-height:1.55; color:rgba(255,255,255,.8); max-width:30rem; }
+.recit h2, .recit p { transition:opacity .4s, transform .5s cubic-bezier(.2,.8,.3,1); }
+.recit.sort h2, .recit.sort p { opacity:0; transform:translateY(10px); }
+
+.rail { position:absolute; left:28px; bottom:22px; z-index:4; display:flex; align-items:center; gap:7px; }
+/* le trait fait 3 px mais le bouton en fait 24 : la cible reste atteignable
+   au doigt comme a la souris (WCAG 2.2, 2.5.8) */
+.tiret { position:relative; width:30px; height:24px; border:0; padding:0; background:none;
+  cursor:pointer; transition:width .4s; display:flex; align-items:center; }
+.tiret::before { content:""; position:absolute; left:0; right:0; top:50%; height:3px;
+  margin-top:-1.5px; border-radius:999px; background:rgba(255,255,255,.26); }
+.tiret.actif { width:56px; }
+.tiret i { position:relative; z-index:1; display:block; height:3px; width:0; border-radius:999px;
+  background:linear-gradient(90deg,var(--or),var(--or-clair)); }
+.tiret.actif i { animation:remplit 6s linear forwards; }
+@keyframes remplit { to { width:100%; } }
+.pause { margin-left:6px; width:26px; height:26px; border-radius:50%; cursor:pointer;
+  border:1px solid rgba(255,255,255,.3); background:rgba(255,255,255,.14); color:#fff;
+  display:grid; place-items:center; transition:background .18s; }
+.pause:hover { background:rgba(255,255,255,.3); }
+
+/* particules chiffrees */
+.champ-donnees { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.flottant { position:absolute; font-family:var(--display); font-weight:500; white-space:nowrap;
+  font-variant-numeric:tabular-nums; color:rgba(255,255,255,.4); animation:derive linear forwards; }
+.flottant.dore { color:rgba(246,231,180,.5); }
+@keyframes derive {
+  from { opacity:0; transform:translate3d(0,22px,0) scale(.9); }
+  18% { opacity:1; }
+  to { opacity:0; transform:translate3d(0,-120px,0) scale(1.04); }
+}
+
+
+.avis { position:fixed; z-index:6; left:50%; transform:translateX(-50%);
+  bottom:calc(62px + env(safe-area-inset-bottom, 0px)); margin:0; padding:7px 14px;
+  border-radius:999px; font-size:.75rem; color:#F6E7B4; text-align:center;
+  background:rgba(8,28,54,.88); border:1px solid rgba(246,231,180,.3); }
+
+:focus-visible { outline:2px solid var(--or-clair); outline-offset:3px; }
+
+@media (max-width:900px) {
+  .face { grid-template-columns:1fr; }
+  .volet-droit { display:none; }
+  .carte { height:min(620px,88vh); }
+  .volet-gauche { padding:24px 20px 18px; }
+  .filigrane { display:none; }
+  .assurance { margin-top:14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sceau .blob, .lisere, .tiret.actif i, .bienvenue .halo { animation:none; }
+  .carte, .bulle, .recit h2, .recit p { transition:none; }
+  .flottant { display:none; }
+}
+
+/* message d'erreur renvoye par le serveur */
+.volet-gauche .alerte { position:relative; z-index:1; margin:0 0 14px; padding:10px 13px;
+  border-radius:12px; font-size:.86rem; line-height:1.4;
+  background:rgba(214,57,57,.08); border:1px solid rgba(214,57,57,.26); color:#9B2C2C;
+  display:flex; align-items:flex-start; gap:8px; }
+.volet-gauche .alerte svg { flex:none; margin-top:1px; }
+
+/* avis de performance, pose au-dessus du pied */
+.avis-perf { position:fixed; z-index:6; left:50%; transform:translateX(-50%);
+  bottom:calc(16px + env(safe-area-inset-bottom, 0px)); margin:0; padding:7px 15px;
+  border-radius:999px; font-size:.75rem; color:#F6E7B4; text-align:center;
+  background:rgba(8,28,54,.88); border:1px solid rgba(246,231,180,.3); }
+/* le bouton fait 24 px de haut : une cible atteignable, meme dans une phrase */
+.avis-perf button { margin-left:8px; min-height:24px; padding:0 8px; border:0; border-radius:7px;
+  background:rgba(255,255,255,.14); color:#fff; cursor:pointer; font:inherit; text-decoration:underline; }
+.avis-perf button:hover { background:rgba(255,255,255,.26); }

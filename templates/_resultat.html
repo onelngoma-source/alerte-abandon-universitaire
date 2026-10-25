@@ -1,0 +1,32 @@
+{# Resultat d'une estimation (deux modeles, facteurs, conseils). Partage par la saisie individuelle
+   et par la fiche d'un etudiant ; rempli par static/js/resultat.js. #}
+<div class="card mb-3"><div class="card-body">
+  <div class="alert alert-info mb-3" data-role="bandeau-precoce" hidden>
+    Estimation faite à partir du 1er semestre uniquement.</div>
+  <div class="row text-center">
+    <div class="col-6"><div class="subheader">Approche à noyau</div>
+      <div class="proba-grande" data-role="p-noyau">-</div>
+      <span class="badge badge-risque mt-1" data-role="b-noyau">-</span>
+      <div class="progress barre-risque mt-2"><div class="progress-bar" data-role="barre-noyau"></div></div>
+      <div class="small text-secondary mt-2" data-role="v-noyau"></div></div>
+    <div class="col-6"><div class="subheader">Random Forest</div>
+      <div class="proba-grande" data-role="p-ml">-</div>
+      <span class="badge badge-risque mt-1" data-role="b-ml">-</span>
+      <div class="progress barre-risque mt-2"><div class="progress-bar" data-role="barre-ml"></div></div>
+      <div class="small text-secondary mt-2" data-role="v-ml"></div></div>
+  </div>
+  <div class="text-secondary small mt-3" data-role="note-estimees"></div>
+</div></div>
+
+<div class="card mb-3" data-role="carte-voisins"><div class="card-header"><h3 class="card-title">Étudiants au profil le plus proche</h3></div>
+  <div class="card-body">
+    <div class="table-responsive"><table class="table table-sm table-vcenter mb-2 voisins-table">
+      <thead data-role="voisins-entetes"></thead><tbody data-role="voisins-lignes"></tbody></table></div>
+    <div class="small text-secondary" data-role="voisins-bas"></div>
+  </div></div>
+
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Ce qui pèse le plus sur cette estimation</h3></div>
+  <div class="list-group list-group-flush" data-role="facteurs"></div></div>
+
+<div class="card mb-3"><div class="card-header"><h3 class="card-title">Pistes d'accompagnement</h3></div>
+  <div class="list-group list-group-flush" data-role="conseils"></div></div>

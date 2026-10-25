@@ -1,0 +1,30 @@
+Image de fond de la page de connexion
+=====================================
+
+Pour changer le fond, deposez simplement une image dans ce dossier, nommee
+"connexion" :
+
+    connexion.jpg        (ou .jpeg, .png, .webp, .avif)
+
+Rechargez la page de connexion : l'image est prise en compte aussitot, sans
+toucher au code. Retirez le fichier pour revenir au degrade bleu d'origine.
+
+Conseils
+--------
+- Format paysage, au moins 1920 x 1080 pixels, moins de 1 Mo si possible
+  (une image lourde ralentit l'ouverture de la page).
+- Une image calme, sans texte ni details au centre : la carte de connexion
+  se pose par-dessus.
+- L'image s'affiche telle quelle, sans assombrissement. Rien n'est ecrit
+  directement dessus : le texte vit dans la carte blanche et dans le volet bleu.
+
+Reglages facultatifs (variables d'environnement)
+------------------------------------------------
+FOND_CONNEXION   nom d'un autre fichier de ce dossier (par exemple
+                 "campus-nuit.jpg"), ou une adresse web commencant par https://
+FOND_VOILE       assombrissement de l'image, de 0 a 90. Valeur par defaut : 0,
+                 c'est-a-dire aucun. Montez-la si votre image est trop claire
+                 ou trop chargee et que la carte de connexion s'y perd.
+
+Exemple :
+    FOND_CONNEXION=campus-nuit.jpg FOND_VOILE=35 python app.py

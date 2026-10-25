@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block titre %}Tableau de bord · Alerte précoce{% endblock %}
+{% block entete %}Tableau de bord{% endblock %}
+{% block vignette %}
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+     stroke-linecap="round" stroke-linejoin="round"><path d="M4 18V9"/><path d="M10 18V5"/><path d="M16 18v-6"/><path d="M3 21h18"/></svg>
+{% endblock %}
+
+{% block contexte %}
+{% set a_jeu_de_test = cohortes | selectattr('origine', 'equalto', 'test_uci') | list | length > 0 %}
+{% if cohortes %}
+<span class="barre-sep" aria-hidden="true"></span>
+<label class="visually-hidden" for="choix-cohorte">Cohorte affichée</label>
+<select id="choix-cohorte" class="selecteur-cohorte">
+  {% for c in cohortes %}
+  <option value="{{ c.id }}" {{ 'selected' if c.id == courante }}>{{ c.nom }}</option>
+  {% endfor %}
+</select>
+{% endif %}
+<span class="pousse-droite"></span>
+{% if cohortes %}
+{% if not a_jeu_de_test %}<button class="bouton" type="button" id="btn-charger-test">Charger le jeu de test</button>{% endif %}
+{% if not mode_demo %}<button class="bouton" type="button" id="btn-supprimer">
+  <span class="mot-bouton">Supprimer cette cohorte</span>
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="d-none d-md-none">
+    <path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
+</button>
+<button class="bouton danger" type="button" id="btn-vider"><span class="mot-bouton">Vider la base</span></button>{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block contenu %}
+<section class="ecran" id="etat-vide" {% if cohortes %}hidden{% endif %}>
+  <div class="zone-import">
+    <div class="panneau-etape">
+      <div class="card succes">
+        <span class="cercle-depot" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 18V9"/><path d="M10 18V5"/><path d="M16 18v-6"/><path d="M3 21h18"/></svg>
+        </span>
+        <h3>La base est vide</h3>
+        <p>Aucun étudiant n'est encore chargé. Chargez le jeu de démonstration de 1 328 étudiants,
+           ou importez votre propre fichier depuis « Import CSV ».</p>
+        <div class="pied-carte centre" style="display:flex; gap:9px; justify-content:center; padding-top:16px">
+          <button class="bouton plein" type="button" id="btn-charger-test-vide">Charger le jeu de test</button>
+        </div>
+        <div class="text-secondary small mt-3" id="chargement" hidden>Calcul du risque de chaque étudiant en cours…</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "_cohorte.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/resultat.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cohorte.js') }}"></script>
+<script>
+(function () {
+  const vue = Cohorte.monter(document.getElementById('cohorte-vue'));
+  const courante = {{ courante if courante else 'null' }};
+  const choix = document.getElementById('choix-cohorte');
+
+  async function afficher(id) {
+    const res = await fetch('/api/cohortes/' + id);
+    if (!res.ok) { location.reload(); return; }
+    const donnees = await res.json();
+    document.getElementById('etat-vide').hidden = true;
+    vue.afficher(donnees);
+  }
+
+  async function charger() {
+    document.querySelectorAll('#btn-charger-test, #btn-charger-test-vide').forEach((b) => { if (b) b.disabled = true; });
+    const info = document.getElementById('chargement'); if (info) info.hidden = false;
+    if (window.Chargement) window.Chargement.afficher('Calcul du risque des 1 328 étudiants');
+    const res = await fetch('/api/cohortes/jeu-de-test', { method: 'POST' });
+    const json = await res.json();
+    location.href = '/tableau?cohorte=' + json.cohorte_id;
+  }
+
+  if (courante) afficher(courante);
+  if (choix) choix.addEventListener('change', () => { history.replaceState(null, '', '/tableau?cohorte=' + choix.value); afficher(choix.value); });
+  ['btn-charger-test', 'btn-charger-test-vide'].forEach((id) => { const b = document.getElementById(id); if (b) b.addEventListener('click', charger); });
+  const bs = document.getElementById('btn-supprimer');
+  if (bs) bs.addEventListener('click', async () => {
+    if (!confirm('Supprimer cette cohorte de la base ?')) return;
+    await fetch('/api/cohortes/' + choix.value, { method: 'DELETE' }); location.href = '/tableau';
+  });
+  const bv = document.getElementById('btn-vider');
+  if (bv) bv.addEventListener('click', async () => {
+    if (!confirm('Vider entièrement la base (toutes les cohortes) ?')) return;
+    await fetch('/api/cohortes/vider', { method: 'POST' }); location.href = '/tableau';
+  });
+})();
+</script>
+{% endblock %}

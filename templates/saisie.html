@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block titre %}Saisie individuelle · Alerte précoce{% endblock %}
+{% block entete %}Saisie individuelle{% endblock %}
+{% block vignette %}
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+     stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+{% endblock %}
+
+{% block contexte %}
+<span class="barre-sep" aria-hidden="true"></span>
+<span class="etat-mode" id="etat-mode" data-mode="vide">
+  <span class="point" aria-hidden="true"></span><span id="etat-mode-texte">Formulaire vide</span>
+</span>
+<span class="progression" id="progression" aria-live="polite">
+  <span class="piste"><i id="progression-barre"></i></span>
+  <span id="progression-texte">0 champ sur 13</span>
+</span>
+<span class="pousse-droite"></span>
+<div class="menu" id="menu-exemple">
+  <button class="bouton" type="button" id="bouton-exemple" aria-expanded="false" aria-haspopup="true">
+    Remplir un exemple
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+  <div class="liste-menu" id="liste-exemple" role="menu">
+    <button type="button" role="menuitem" data-exemple="fragile">Profil fragile</button>
+    <button type="button" role="menuitem" data-exemple="intermediaire">Profil intermédiaire</button>
+    <button type="button" role="menuitem" data-exemple="solide">Profil solide</button>
+    <button type="button" role="menuitem" data-exemple="precoce">Fin de 1er semestre</button>
+  </div>
+</div>
+<button class="bouton rond" type="button" id="effacer" aria-label="Vider le formulaire">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
+</button>
+{% endblock %}
+
+{# Chaque libelle est relie a son champ (for/id) : sans cela, un lecteur d'ecran
+   annonce « zone de saisie » sans dire de quelle variable il s'agit. #}
+{% macro nombre(c, pas='1', facultatif=False, unite='', large=False) %}
+{% set cid = 'champ-' ~ c|replace(' ', '-')|replace('(', '')|replace(')', '')|lower %}
+<div class="bloc-champ{{ ' large' if large }}">
+  <label for="{{ cid }}">{{ libelles[c] }}</label>
+  <span class="boite">
+    <input type="number" id="{{ cid }}" step="{{ pas }}" min="{{ bornes[c][0]|round(1) }}" max="{{ bornes[c][1]|round(1) }}"
+           name="{{ c }}" aria-describedby="{{ cid }}-aide" {% if not facultatif %}required{% endif %}>
+    {% if unite %}<span class="unite" aria-hidden="true">{{ unite }}</span>{% endif %}
+  </span>
+  <span class="bornes" id="{{ cid }}-aide">de {{ bornes[c][0]|round(0)|int }} à {{ bornes[c][1]|round(0)|int }}</span>
+</div>
+{% endmacro %}
+{% macro ouinon(c) %}
+{% set cid = 'champ-' ~ c|replace(' ', '-')|lower %}
+<div class="bloc-champ">
+  <label for="{{ cid }}">{{ libelles[c] }}</label>
+  <span class="boite">
+    <select id="{{ cid }}" name="{{ c }}" required><option value="1">Oui</option><option value="0">Non</option></select>
+  </span>
+</div>
+{% endmacro %}
+
+{% block contenu %}
+<section class="ecran">
+  <div class="deux-colonnes" id="deux-colonnes" data-resultat="visible">
+
+    <form class="card colonne-form" id="formulaire" autocomplete="off">
+      <div class="defile-form">
+        <fieldset class="groupe">
+          <legend>Premier semestre</legend>
+          <div class="grille-champs">
+            {{ nombre('Curricular units 1st sem (enrolled)') }}{{ nombre('Curricular units 1st sem (approved)') }}
+            {{ nombre('Curricular units 1st sem (evaluations)') }}{{ nombre('Curricular units 1st sem (grade)', '0.1', unite='/20') }}
+          </div>
+        </fieldset>
+
+        <fieldset class="groupe">
+          <legend>Deuxième semestre <span class="option">facultatif</span></legend>
+          <p class="aide-groupe">Laissez ces champs vides si l'étudiant n'a fait que le premier semestre :
+             l'estimation se fait alors sur les seules données du premier semestre.</p>
+          <div class="grille-champs">
+            {{ nombre('Curricular units 2nd sem (enrolled)', facultatif=True) }}{{ nombre('Curricular units 2nd sem (approved)', facultatif=True) }}
+            {{ nombre('Curricular units 2nd sem (evaluations)', facultatif=True) }}{{ nombre('Curricular units 2nd sem (grade)', '0.1', True, '/20') }}
+          </div>
+        </fieldset>
+
+        <fieldset class="groupe">
+          <legend>Situation</legend>
+          <div class="grille-champs">
+            <div class="bloc-champ large">
+              <label for="champ-course">{{ libelles['Course'] }}</label>
+              <span class="boite">
+                <select id="champ-course" name="Course" required>
+                  {% for code, nom in filieres.items() %}<option value="{{ code }}" {{ 'selected' if code == 9238 }}>{{ nom }}</option>{% endfor %}
+                </select>
+              </span>
+            </div>
+            {{ nombre('Age at enrollment', '0.1', unite='ans') }}
+            {{ ouinon('Scholarship holder') }}{{ ouinon('Debtor') }}{{ ouinon('Tuition fees up to date') }}
+          </div>
+        </fieldset>
+
+        <div id="erreur" class="alert alert-danger mt-3 mb-0" role="alert" hidden></div>
+      </div>
+      <div class="pied-form">
+        <button type="submit" class="bouton plein grand">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l5-6 4 4 7-9"/></svg>
+          Estimer le risque
+        </button>
+      </div>
+    </form>
+
+    <div class="colonne-resultat" id="colonne-resultat">
+      <button class="fermer-resultat" type="button" id="fermer-resultat"
+              aria-label="Masquer le résultat et élargir le formulaire">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+      </button>
+
+      <div class="card attente" id="attente">
+        <svg width="86" height="66" viewBox="0 0 120 92" fill="none" aria-hidden="true">
+          <rect x="6" y="10" width="108" height="72" rx="12" stroke="#CBD7E6" stroke-width="2" stroke-dasharray="7 7"/>
+          <path d="M22 66 C 42 60, 54 46, 70 42 S 96 24, 104 20" stroke="#9FB6CE" stroke-width="2.4"
+                stroke-linecap="round" fill="none"/>
+          <circle cx="70" cy="42" r="4.6" fill="#D8B85C"/>
+        </svg>
+        <p class="titre-attente">Le résultat s'affichera ici</p>
+        <p class="texte-attente">Renseignez la situation de l'étudiant, puis lancez l'estimation.
+           Les deux modèles répondent côte à côte, avec les étudiants au profil le plus proche.</p>
+      </div>
+
+      <div id="resultat" hidden>
+        {% include "_resultat.html" %}
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/resultat.js') }}"></script>
+<script src="{{ url_for('static', filename='js/saisie.js') }}"></script>
+{% endblock %}
