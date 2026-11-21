@@ -1,49 +1,60 @@
-"""Recommandations d'accompagnement fondees sur le profil saisi (Objectif 3, Chapitre IV)."""
+"""Pistes d'accompagnement, tirees des leviers sur lesquels l'etablissement peut agir.
+
+Elles partent des valeurs reellement fournies (une valeur absente ne declenche rien) et
+sont rangees par domaine : resultats, finances, situation personnelle. Ce sont des pistes
+pour le conseiller, pas des decisions du modele.
+"""
 from .scoring import vers_nombre
 
 
 def generer_conseils(reponses: dict) -> list[dict]:
-    def nombre(cle, defaut):
+    def nombre(cle):
         try:
-            valeur = vers_nombre(reponses.get(cle))
+            return vers_nombre(reponses.get(cle))
         except ValueError:
-            valeur = None
-        return defaut if valeur is None else valeur
-
-    note_s1 = nombre("Curricular units 1st sem (grade)", 20)
-    note_s2 = nombre("Curricular units 2nd sem (grade)", 20)
-    validees_s1 = nombre("Curricular units 1st sem (approved)", 10)
-    validees_s2 = nombre("Curricular units 2nd sem (approved)", 10)
-    inscrites_s1 = nombre("Curricular units 1st sem (enrolled)", validees_s1 or 1)
-    inscrites_s2 = nombre("Curricular units 2nd sem (enrolled)", validees_s2 or 1)
-    debiteur = nombre("Debtor", 0) == 1
-    boursier = nombre("Scholarship holder", 0) == 1
-    frais_a_jour = nombre("Tuition fees up to date", 1) == 1
-    age = nombre("Age at enrollment", 18)
+            return None
 
     conseils = []
-    if note_s1 < 10 or note_s2 < 10:
-        conseils.append({"type": "academique", "message":
-            "Résultats académiques fragiles (moyenne inférieure à 10/20) : orienter vers un dispositif de tutorat ou de soutien pédagogique."})
-    if validees_s1 < 4 or validees_s2 < 4:
-        conseils.append({"type": "academique", "message":
-            "Peu d'unités curriculaires validées : vérifier la charge de cours et envisager un aménagement du parcours."})
-    for libelle, inscrites, validees in (("1er", inscrites_s1, validees_s1), ("2e", inscrites_s2, validees_s2)):
-        if inscrites > 0 and validees / inscrites < 0.5:
-            conseils.append({"type": "academique", "message":
-                f"Taux de réussite au {libelle} semestre inférieur à 50 % ({int(validees)}/{int(inscrites)} unités) : "
-                "signal plus fort qu'un simple nombre bas, même avec une charge de cours normale."})
+
+    def ajouter(type_, titre, message):
+        conseils.append({"type": type_, "titre": titre, "message": message})
+
+    for s, libelle in (("1st", "1er"), ("2nd", "2e")):
+        inscrites = nombre(f"Curricular units {s} sem (enrolled)")
+        validees = nombre(f"Curricular units {s} sem (approved)")
+        note = nombre(f"Curricular units {s} sem (grade)")
+        evaluations = nombre(f"Curricular units {s} sem (evaluations)")
+        if inscrites and validees is not None and validees / inscrites < 0.5:
+            ajouter("academique", f"Rattrapage du {libelle} semestre",
+                    f"{int(validees)} unité(s) validée(s) sur {int(inscrites)} au {libelle} semestre : "
+                    "faire le point sur les unités à repasser, proposer un tutorat et, si besoin, alléger la charge de cours.")
+        elif note is not None and 0 < note < 10:
+            ajouter("academique", f"Soutien pédagogique ({libelle} semestre)",
+                    f"Moyenne de {note:.1f}/20 au {libelle} semestre : orienter vers un tutorat ou un groupe de travail.".replace(".", ",", 1))
+        if inscrites and evaluations is not None and evaluations < inscrites:
+            ajouter("academique", f"Assiduité aux évaluations ({libelle} semestre)",
+                    f"{int(evaluations)} évaluation(s) passée(s) pour {int(inscrites)} unités inscrites : "
+                    "vérifier les absences aux examens et leurs raisons.")
+
+    debiteur = nombre("Debtor") == 1
+    frais_a_jour = nombre("Tuition fees up to date")
+    boursier = nombre("Scholarship holder") == 1
     if debiteur:
-        conseils.append({"type": "financier", "message":
-            "Situation de débiteur : orienter vers le service financier pour un plan d'apurement "
-            "(71 % d'abandon chez les étudiants débiteurs des cohortes 2008 à 2014)."})
-    if not boursier and not frais_a_jour:
-        conseils.append({"type": "financier", "message":
-            "Pas de bourse et retard de paiement des frais : évaluer l'éligibilité à une aide financière d'urgence."})
-    if age >= 23:
-        conseils.append({"type": "social", "message":
-            "Profil d'étudiant non traditionnel (Bean et Metzner, 1985) : vérifier la compatibilité entre emploi ou charges familiales et charge d'études."})
+        ajouter("financier", "Plan d'apurement",
+                "Étudiant débiteur : orienter vers le service financier pour un plan d'apurement "
+                "(71 % d'abandon chez les étudiants débiteurs des cohortes 2008 à 2014).")
+    if frais_a_jour == 0:
+        ajouter("financier", "Aide financière",
+                "Frais de scolarité en retard de paiement : vérifier l'éligibilité à une aide d'urgence ou à un échelonnement"
+                + (" et à une bourse." if not boursier else "."))
+
+    age = nombre("Age at enrollment")
+    if age is not None and age >= 23:
+        ajouter("social", "Conciliation études et vie personnelle",
+                "Étudiant de 23 ans ou plus à l'inscription : vérifier la compatibilité entre un emploi ou des charges "
+                "familiales et la charge d'études (aménagement d'emploi du temps, cours du soir).")
+
     if not conseils:
-        conseils.append({"type": "aucun", "message":
-            "Aucun facteur de risque majeur identifié parmi les indicateurs suivis : poursuivre le suivi standard."})
+        ajouter("aucun", "Suivi habituel",
+                "Aucun signal particulier parmi les résultats, les finances et la situation renseignés : suivi habituel.")
     return conseils

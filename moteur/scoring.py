@@ -25,6 +25,7 @@ from .referentiels import (
     CHAMPS_OUI_NON, FILIERES, LIBELLES_CHAMPS, LIBELLES_MOMENTS, SEUIL_ALERTE, SEUIL_ELEVE, SEUIL_MOYEN,
     code_filiere,
 )
+from .langage import DOMAINES, LEVIERS, domaine, intensite, phrase
 from .variables import BINAIRES, MOMENTS, NOMINALES, preparer, semestre
 
 RACINE = Path(__file__).resolve().parent.parent
@@ -34,6 +35,23 @@ _EQUIVALENCES = {"oui": 1, "yes": 1, "vrai": 1, "true": 1, "non": 0, "no": 0, "f
 _COURTS = {"Curricular units 1st sem (approved)": "Val. S1", "Curricular units 2nd sem (approved)": "Val. S2",
            "Curricular units 1st sem (grade)": "Moy. S1", "Curricular units 2nd sem (grade)": "Moy. S2",
            "Tuition fees up to date": "Frais à jour", "Age at enrollment": "Âge"}
+
+
+def regrouper_pour_affichage(contributions: pd.DataFrame, X: pd.DataFrame) -> pd.DataFrame:
+    """Pour l'affichage seulement : « unites validees » et « taux de validation » d'un meme semestre
+    disent la meme chose (« 2 validees sur 6 ») ; leurs contributions sont additionnees sous le taux.
+    Sans unite validee, la moyenne est indefinie : son terme rejoint lui aussi le taux de validation."""
+    c = contributions.copy()
+    for s in ("1st", "2nd"):
+        taux, validees = f"taux_validation_{s}", f"Curricular units {s} sem (approved)"
+        note = f"Curricular units {s} sem (grade)"
+        if taux in c.columns and validees in c.columns:
+            c[taux] = c[taux] + c[validees]
+            c = c.drop(columns=validees)
+            sans_moyenne = (X[validees] == 0).to_numpy()
+            c.loc[sans_moyenne, taux] += c.loc[sans_moyenne, note]
+            c.loc[sans_moyenne, note] = 0.0
+    return c
 
 
 def categorie(probabilite: float) -> str:
@@ -174,7 +192,7 @@ class Moteur:
         probabilite_noyau, probabilite_ml (regression logistique), categorie_noyau, categorie_ml,
         mode_calcul (T0, T1 ou T2), nb_estimees."""
         colonnes = ["probabilite_noyau", "probabilite_ml", "categorie_noyau", "categorie_ml",
-                    "mode_calcul", "nb_estimees"]
+                    "mode_calcul", "nb_estimees", "facteur", "domaine_facteur"]
         if valeurs.empty:
             return pd.DataFrame(columns=colonnes)
         moments = self.moments(valeurs)
@@ -184,8 +202,12 @@ class Moteur:
             if not filtre.any():
                 continue
             completees, masque = self._completer(valeurs[filtre], moment)
-            p_noyau, p_ml, _ = self._probabilites(completees, moment)
+            p_noyau, p_ml, X = self._probabilites(completees, moment)
+            principal = regrouper_pour_affichage(self.contributions_matrice(X, moment), X).idxmax(axis=1)
+            lignes = X.to_dict("records")
             morceaux.append(pd.DataFrame({
+                "facteur": [phrase(v, l, court=True) for v, l in zip(principal, lignes)],
+                "domaine_facteur": [domaine(v) for v in principal],
                 "probabilite_noyau": np.round(p_noyau, 6),
                 "probabilite_ml": np.round(p_ml, 6),
                 "mode_calcul": moment,
@@ -202,23 +224,27 @@ class Moteur:
         return self.scorer_valeurs(valeurs.drop(index=list(erreurs)))
 
     # ------------------------------------------------------------------ explications
-    def contributions(self, X: pd.DataFrame, moment: str) -> dict[str, float]:
+    def contributions_matrice(self, X: pd.DataFrame, moment: str) -> pd.DataFrame:
         """Contribution de chaque variable au logit de la regression logistique, par rapport a
-        l'etudiant moyen du developpement : coefficient x (valeur - valeur moyenne). Pour un modele
-        lineaire, ce sont exactement les valeurs de Shapley ; leur somme vaut logit(p) - logit de reference."""
+        l'etudiant moyen du developpement : coefficient x (valeur - valeur moyenne), une ligne par
+        etudiant. Pour un modele lineaire, ce sont exactement les valeurs de Shapley ; leur somme
+        vaut logit(p) - logit de reference. Les indicatrices d'une meme variable sont regroupees."""
         modele = self.modeles[moment]["logistique"]
         prep, lr = modele.named_steps["prep"], modele.named_steps["m"]
-        z = prep.transform(X)[0]
-        brut = lr.coef_[0] * (z - self.moyennes[moment])
-        totaux: dict[str, float] = {}
-        for nom, c in zip(prep.get_feature_names_out(), brut):
+        brut = lr.coef_[0] * (prep.transform(X) - self.moyennes[moment])
+        noms = []
+        for nom in prep.get_feature_names_out():
             bloc, variable = nom.split("__", 1)
             if bloc == "nominales":
                 variable = next(v for v in NOMINALES if variable.startswith(v + "_"))
             elif variable.startswith("missingindicator_"):
                 variable = variable[len("missingindicator_"):]
-            totaux[variable] = totaux.get(variable, 0.0) + float(c)
-        return totaux
+            noms.append(variable)
+        return pd.DataFrame(brut, index=X.index, columns=noms).T.groupby(level=0, sort=False).sum().T
+
+    def contributions(self, X: pd.DataFrame, moment: str) -> dict[str, float]:
+        """Contributions du premier etudiant de X (voir contributions_matrice)."""
+        return {k: float(v) for k, v in self.contributions_matrice(X.iloc[:1], moment).iloc[0].items()}
 
     def logit_reference(self, moment: str) -> float:
         """Logit de l'etudiant moyen du developpement : point de depart des contributions."""
@@ -304,6 +330,7 @@ class Moteur:
                 "estimee": nom in estimees,
             })
         return {
+            "probabilite": p_ml, "categorie": categorie(p_ml),
             "probabilite_noyau": p_noyau, "probabilite_ml": p_ml,
             "categorie_noyau": categorie(p_noyau), "categorie_ml": categorie(p_ml),
             "alerte": p_ml >= round(SEUIL_ALERTE, 3),
@@ -312,7 +339,45 @@ class Moteur:
             "nb_variables_estimees": len(estimees),
             "nb_variables_modele": len(variables_du_moment(moment)),
             "voisins_noyau": self.voisins_noyau(X, moment),
+            "trajectoire": self.trajectoire(valeurs, moment, p_ml),
+            **self.facteurs_clairs(contributions, X.iloc[0].to_dict(), estimees),
         }
+
+    def facteurs_clairs(self, contributions: dict, ligne: dict, estimees: set) -> dict:
+        """Les facteurs en langage clair : ceux qui augmentent le risque, ceux qui le reduisent.
+        Chaque facteur indique son domaine et s'il s'agit d'un levier d'action pendant l'annee."""
+        def decrire(nom, c):
+            d = domaine(nom)
+            return {"texte": phrase(nom, ligne), "court": phrase(nom, ligne, court=True),
+                    "domaine": d, "libelle_domaine": DOMAINES[d], "levier": d in LEVIERS,
+                    "intensite": intensite(c), "contribution": round(float(c), 4),
+                    "estimee": nom in estimees}
+        regroupees = regrouper_pour_affichage(pd.DataFrame([contributions]), pd.DataFrame([ligne])).iloc[0].to_dict()
+        # une valeur estimee (absente du dossier) n'est pas presentee comme un fait sur l'etudiant
+        significatifs = [(n, c) for n, c in regroupees.items() if abs(c) >= 0.05 and n not in estimees]
+        hausse = sorted([x for x in significatifs if x[1] > 0], key=lambda x: -x[1])[:5]
+        baisse = sorted([x for x in significatifs if x[1] < 0], key=lambda x: x[1])[:4]
+        return {"facteurs_hausse": [decrire(n, c) for n, c in hausse],
+                "facteurs_baisse": [decrire(n, c) for n, c in baisse]}
+
+    def trajectoire(self, valeurs: pd.DataFrame, moment: str, p_actuelle: float) -> list[dict]:
+        """Risque recalcule a chaque moment deja franchi, avec l'information connue a ce moment :
+        a l'inscription, puis a la fin du 1er semestre, puis du 2e."""
+        points = []
+        for m in MOMENTS:
+            if m == moment:
+                points.append({"moment": m, "libelle": LIBELLES_MOMENTS[m], "probabilite": p_actuelle,
+                               "categorie": categorie(p_actuelle)})
+                break
+            partielles = valeurs.copy()
+            for s in ("1st", "2nd"):
+                if s not in MOMENTS[m]:
+                    partielles[semestre(s)] = np.nan
+            completees, _ = self._completer(partielles, m)
+            _, p_ml, _ = self._probabilites(completees, m)
+            p = round(float(p_ml[0]), 3)
+            points.append({"moment": m, "libelle": LIBELLES_MOMENTS[m], "probabilite": p, "categorie": categorie(p)})
+        return points
 
     # ------------------------------------------------------------------ indicateurs sur une cohorte
     def metriques(self, y_reel: np.ndarray, p_noyau: np.ndarray, p_ml: np.ndarray) -> dict:

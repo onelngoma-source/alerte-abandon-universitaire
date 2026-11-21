@@ -1,99 +1,134 @@
 {% extends "base.html" %}
-{% block titre %}Tableau de bord · Alerte précoce{% endblock %}
-{% block entete %}Tableau de bord{% endblock %}
-{% block vignette %}
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-     stroke-linecap="round" stroke-linejoin="round"><path d="M4 18V9"/><path d="M10 18V5"/><path d="M16 18v-6"/><path d="M3 21h18"/></svg>
-{% endblock %}
-
-{% block contexte %}
-{% set a_jeu_de_test = cohortes | selectattr('origine', 'equalto', 'test_uci') | list | length > 0 %}
-{% if cohortes %}
-<span class="barre-sep" aria-hidden="true"></span>
-<label class="visually-hidden" for="choix-cohorte">Cohorte affichée</label>
-<select id="choix-cohorte" class="selecteur-cohorte">
-  {% for c in cohortes %}
-  <option value="{{ c.id }}" {{ 'selected' if c.id == courante }}>{{ c.nom }}</option>
-  {% endfor %}
-</select>
-{% endif %}
-<span class="pousse-droite"></span>
-{% if cohortes %}
-{% if not a_jeu_de_test %}<button class="bouton" type="button" id="btn-charger-test">Charger le jeu de test</button>{% endif %}
-{% if not mode_demo %}<button class="bouton" type="button" id="btn-supprimer">
-  <span class="mot-bouton">Supprimer cette cohorte</span>
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="d-none d-md-none">
-    <path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
-</button>
-<button class="bouton danger" type="button" id="btn-vider"><span class="mot-bouton">Vider la base</span></button>{% endif %}
-{% endif %}
-{% endblock %}
-
+{% block titre %}Suivi de cohorte · Alerte précoce{% endblock %}
 {% block contenu %}
-<section class="ecran" id="etat-vide" {% if cohortes %}hidden{% endif %}>
-  <div class="zone-import">
-    <div class="panneau-etape">
-      <div class="card succes">
-        <span class="cercle-depot" aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-               stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 18V9"/><path d="M10 18V5"/><path d="M16 18v-6"/><path d="M3 21h18"/></svg>
-        </span>
-        <h3>La base est vide</h3>
-        <p>Aucun étudiant n'est encore chargé. Chargez le jeu de démonstration de 1 227 étudiants (cohortes 2015 à 2017),
-           ou importez votre propre fichier depuis « Import CSV ».</p>
-        <div class="pied-carte centre" style="display:flex; gap:9px; justify-content:center; padding-top:16px">
-          <button class="bouton plein" type="button" id="btn-charger-test-vide">Charger le jeu de test</button>
-        </div>
-        <div class="text-secondary small mt-3" id="chargement" hidden>Calcul du risque de chaque étudiant en cours…</div>
-      </div>
-    </div>
+{% set a_jeu_de_test = cohortes | selectattr('origine', 'equalto', 'test_uci') | list | length > 0 %}
+<header class="entete-page">
+  <div class="titres">
+    <div class="sur-titre">Suivi de cohorte</div>
+    <h1>Qui accompagner en priorité&nbsp;?</h1>
+    <p class="sous-titre">Les étudiants sont classés du risque d'abandon le plus élevé au plus faible. Indiquez combien vous pouvez
+      en accompagner : la liste montre qui suivre d'abord, et pourquoi.</p>
+  </div>
+  {% if cohortes %}
+  <div class="actions">
+    <label class="visuellement-cache" for="choix-cohorte">Cohorte affichée</label>
+    <select id="choix-cohorte" class="champ" style="min-width:250px">
+      {% for c in cohortes %}<option value="{{ c.id }}" {{ 'selected' if c.id == courante }}>{{ c.nom }} · {{ '{:,}'.format(c.effectif).replace(',', ' ') }} étudiants</option>{% endfor %}
+    </select>
+    <a class="btn" href="{{ url_for('import_csv.page') }}">Importer</a>
+    {% if not a_jeu_de_test %}<button class="btn" type="button" id="btn-charger-test">Charger le jeu de test</button>{% endif %}
+    {% if not mode_demo %}<button class="btn btn-danger" type="button" id="btn-supprimer" title="Supprimer cette cohorte">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
+      <span class="visuellement-cache">Supprimer cette cohorte</span></button>{% endif %}
+  </div>
+  {% endif %}
+</header>
+
+{% if not cohortes %}
+<section class="carte etat-vide" id="etat-vide">
+  <span class="cercle"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/></svg></span>
+  <h2>Aucune cohorte pour l'instant</h2>
+  <p>Importez le fichier de vos étudiants, ou chargez les 1 227 étudiants des cohortes 2015 à 2017 pour découvrir l'outil.</p>
+  <div class="actions" style="justify-content:center">
+    <button class="btn btn-plein" type="button" id="btn-charger-test-vide">Charger le jeu de test</button>
+    <a class="btn" href="{{ url_for('import_csv.page') }}">Importer un fichier</a>
   </div>
 </section>
+{% else %}
+<div id="cohorte-vue">
+  <section class="indicateurs">
+    <div class="carte indicateur"><div class="libelle">Étudiants suivis</div><div class="valeur tnum" id="kpi-effectif">–</div><div class="detail" id="kpi-moment">&nbsp;</div></div>
+    <div class="carte indicateur accent"><div class="libelle"><span class="point eleve"></span>En alerte</div><div class="valeur tnum" id="kpi-alerte">–</div><div class="detail">risque d'au moins 1 sur 6</div></div>
+    <div class="carte indicateur"><div class="libelle"><span class="point eleve"></span>Risque élevé</div><div class="valeur tnum" id="kpi-eleve">–</div><div class="detail">plus d'une chance sur deux</div></div>
+    <div class="carte indicateur"><div class="libelle"><span class="point faible"></span>Sans alerte</div><div class="valeur tnum" id="kpi-faible">–</div><div class="detail">suivi habituel</div></div>
+  </section>
 
-{% include "_cohorte.html" %}
+  <section class="carte capacite">
+    <div>
+      <h2>Capacité d'accompagnement</h2>
+      <p class="discret petit">Part des étudiants que l'équipe peut suivre de près ce semestre.</p>
+      <div class="curseur">
+        <input type="range" id="capacite" min="5" max="60" step="1" value="20" aria-label="Part des étudiants accompagnés">
+        <output id="capacite-valeur" for="capacite">20 %</output>
+      </div>
+    </div>
+    <div>
+      <p class="phrase" id="capacite-phrase">&nbsp;</p>
+      <div class="barre-file" id="barre-file" aria-hidden="true"></div>
+      <div class="legende-file"><span><i style="background:var(--marine)"></i>Accompagnés</span><span><i style="background:var(--moyen)"></i>En alerte, hors capacité</span><span><i style="background:var(--trait-fort)"></i>Sans alerte</span></div>
+    </div>
+  </section>
+
+  <div class="mise-en-page">
+    <section class="carte">
+      <div class="outils">
+        <div class="recherche"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input class="champ" type="search" id="recherche" placeholder="Rechercher une référence" aria-label="Rechercher une référence"></div>
+        <div class="segments" role="group" aria-label="Niveau de risque" id="niveaux">
+          <button type="button" data-niveau="tous" aria-pressed="true">Tous</button>
+          <button type="button" data-niveau="alerte" aria-pressed="false">En alerte</button>
+          <button type="button" data-niveau="eleve" aria-pressed="false"><span class="point eleve"></span>Élevé</button>
+          <button type="button" data-niveau="moyen" aria-pressed="false"><span class="point moyen"></span>Moyen</button>
+          <button type="button" data-niveau="faible" aria-pressed="false"><span class="point faible"></span>Faible</button>
+        </div>
+        <select class="champ" id="filiere" aria-label="Filière"><option value="">Toutes les filières</option></select>
+        <label class="interrupteur"><input type="checkbox" id="prioritaires">File d'accompagnement seulement</label>
+        <label class="interrupteur" id="bascule-devenir" hidden><input type="checkbox" id="devenir">Devenir réel</label>
+      </div>
+      <div class="tableau-wrap">
+        <table class="liste">
+          <thead><tr><th>Rang</th><th>Étudiant</th><th>Risque d'abandon</th><th>Ce qui pèse le plus</th><th>Signaux</th><th>Estimé</th><th class="col-devenir" hidden>Devenir réel</th></tr></thead>
+          <tbody id="lignes"></tbody>
+        </table>
+      </div>
+      <div class="vide-liste" id="aucun" hidden>Aucun étudiant ne correspond à ces filtres.</div>
+      <div class="pagination"><span id="compte">&nbsp;</span>
+        <span class="actions"><button class="btn btn-petit" id="page-prec" type="button">Précédent</button><span id="page-num" class="tnum"></span><button class="btn btn-petit" id="page-suiv" type="button">Suivant</button></span></div>
+    </section>
+
+    <aside class="grille">
+      <section class="carte" id="carte-verification" hidden>
+        <div class="carte-tete"><h2>Cohorte au devenir connu</h2></div>
+        <div class="carte-corps"><p class="texte-court" id="verification"></p>
+          <p class="petit" style="margin-top:10px"><a href="{{ url_for('fiabilite.page') }}">Toute l'évaluation dans « Fiabilité du modèle »</a></p></div>
+      </section>
+      <section class="carte">
+        <div class="carte-tete"><h2>Où se concentrent les alertes</h2></div>
+        <div class="carte-corps"><p class="discret petit" style="margin-bottom:12px">Part des étudiants en alerte, par filière. Cliquez pour filtrer.</p>
+          <div class="barres" id="par-filiere"></div></div>
+      </section>
+      <section class="carte">
+        <div class="carte-tete"><h2>Sur quoi agir</h2></div>
+        <div class="carte-corps"><p class="discret petit" style="margin-bottom:12px">Pour les étudiants en alerte, domaine du facteur qui pèse le plus.</p>
+          <div class="barres" id="par-domaine"></div></div>
+      </section>
+    </aside>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
-<script src="{{ url_for('static', filename='js/resultat.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cohorte.js') }}"></script>
 <script>
 (function () {
-  const vue = Cohorte.monter(document.getElementById('cohorte-vue'));
   const courante = {{ courante if courante else 'null' }};
   const choix = document.getElementById('choix-cohorte');
+  if (courante) Cohorte.charger(courante);
+  if (choix) choix.addEventListener('change', () => { history.replaceState(null, '', '/tableau?cohorte=' + choix.value); Cohorte.charger(choix.value); });
 
-  async function afficher(id) {
-    const res = await fetch('/api/cohortes/' + id);
-    if (!res.ok) { location.reload(); return; }
-    const donnees = await res.json();
-    document.getElementById('etat-vide').hidden = true;
-    vue.afficher(donnees);
-  }
-
-  async function charger() {
-    document.querySelectorAll('#btn-charger-test, #btn-charger-test-vide').forEach((b) => { if (b) b.disabled = true; });
-    const info = document.getElementById('chargement'); if (info) info.hidden = false;
-    if (window.Chargement) window.Chargement.afficher('Calcul du risque des 1 227 étudiants');
-    const res = await fetch('/api/cohortes/jeu-de-test', { method: 'POST' });
-    const json = await res.json();
+  async function chargerTest() {
+    Chargement.afficher('Calcul du risque des 1 227 étudiants');
+    const json = await (await fetch('/api/cohortes/jeu-de-test', { method: 'POST' })).json();
     location.href = '/tableau?cohorte=' + json.cohorte_id;
   }
-
-  if (courante) afficher(courante);
-  if (choix) choix.addEventListener('change', () => { history.replaceState(null, '', '/tableau?cohorte=' + choix.value); afficher(choix.value); });
-  ['btn-charger-test', 'btn-charger-test-vide'].forEach((id) => { const b = document.getElementById(id); if (b) b.addEventListener('click', charger); });
+  ['btn-charger-test', 'btn-charger-test-vide'].forEach((id) => { const b = document.getElementById(id); if (b) b.addEventListener('click', chargerTest); });
   const bs = document.getElementById('btn-supprimer');
   if (bs) bs.addEventListener('click', async () => {
     if (!confirm('Supprimer cette cohorte de la base ?')) return;
-    await fetch('/api/cohortes/' + choix.value, { method: 'DELETE' }); location.href = '/tableau';
-  });
-  const bv = document.getElementById('btn-vider');
-  if (bv) bv.addEventListener('click', async () => {
-    if (!confirm('Vider entièrement la base (toutes les cohortes) ?')) return;
-    await fetch('/api/cohortes/vider', { method: 'POST' }); location.href = '/tableau';
+    const r = await fetch('/api/cohortes/' + choix.value, { method: 'DELETE' });
+    if (!r.ok) { alert((await r.json()).erreur || 'Suppression impossible.'); return; }
+    location.href = '/tableau';
   });
 })();
 </script>

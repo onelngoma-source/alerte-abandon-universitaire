@@ -6,21 +6,22 @@ l'abandon universitaire », dans sa **version rigoureuse** : les modèles vienne
 imbriquée, calibration vérifiée, seuil fixé par les coûts, test scellé ouvert une seule fois).
 La version présentée lors de la soutenance est conservée dans l'historique Git (étiquette `version-soutenance`).
 
-Chaque étudiant reçoit deux estimations :
-- la **régression logistique**, modèle retenu : ses probabilités sont calibrées et c'est elle qui déclenche l'alerte ;
-- l'**approche à noyau** (estimateur de Nadaraya-Watson), pour comparaison : elle s'explique par les étudiants qui lui ressemblent.
+L'application est pensée pour le travail d'un **conseiller pédagogique** : savoir qui accompagner en priorité,
+comprendre pourquoi, et savoir sur quoi agir. Elle affiche **un seul risque**, celui de la **régression logistique**
+(modèle retenu, probabilités calibrées). L'**approche à noyau** de Nadaraya-Watson, sujet du mémoire, sert à montrer sur
+chaque fiche les étudiants passés au profil le plus proche, et elle est comparée en détail dans la page « Fiabilité du modèle ».
 
 Le modèle est choisi selon l'information disponible : **à l'inscription (T0)**, **à la fin du 1er semestre (T1)** ou
 **à la fin du 2e semestre (T2)**. L'alerte se déclenche quand la probabilité atteint **1 sur 6** : un abandon non détecté
 coûte autant que 5 accompagnements inutiles.
 
-L'application a trois volets, qui correspondent à trois modules du code (dossier `volets/`).
-
-| Volet | Page | Rôle |
+| Page | Adresse | Rôle |
 |---|---|---|
-| 1. Tableau de bord | `/tableau` | Les 1 227 étudiants des cohortes 2015 à 2017 (jamais vus à l'entraînement), leur risque selon les deux modèles, filtres en colonne, tri, export, indicateurs, graphique du risque par filière. **Un clic sur une ligne ouvre la fiche de l'étudiant** : deux estimations, alerte, les 5 étudiants qui pèsent le plus dans l'estimation à noyau, facteurs qui pèsent sur le risque, conseils, devenir réel |
-| 2. Saisie individuelle | `/saisie` | Un étudiant, 13 champs ; semestres facultatifs (le modèle T0, T1 ou T2 est choisi selon ce qui est rempli) |
-| 3. Import CSV | `/import` | Un fichier produit le **même tableau** que le tableau de bord (même code de calcul, même gabarit d'affichage). La correspondance des colonnes couvre les **36 variables**, avec suggestion automatique des noms identiques ou proches |
+| Suivi de cohorte | `/tableau` | Les étudiants classés du risque le plus élevé au plus faible. Un **curseur de capacité** (part des étudiants que l'équipe peut suivre) délimite la file d'accompagnement. Pour chacun : risque, niveau, facteur qui pèse le plus (en clair), signaux (dette, frais en retard, unités validées). À côté : alertes par filière, domaine sur lequel agir, et vérification si le devenir réel est connu |
+| Fiche étudiant | `/etudiants/<id>` | Le risque et son niveau, son **évolution** de l'inscription à la fin du 2e semestre, ce qui l'augmente et ce qui le réduit (avec les **leviers d'action**), des pistes d'accompagnement, les 5 étudiants passés au profil le plus proche, le dossier ; navigation vers l'étudiant suivant de la file |
+| Évaluer un étudiant | `/saisie` | Saisie guidée en trois étapes (inscription, 1er semestre, 2e semestre) ; le risque est recalculé à chaque modification |
+| Importer une cohorte | `/import` | Un fichier CSV, une étape d'association des colonnes (36 variables, suggestions automatiques), puis le suivi de la cohorte |
+| Fiabilité du modèle | `/fiabilite` | Évaluation sur les cohortes 2015 à 2017 recalculée au démarrage : ROC-AUC, Brier, part des abandons repérés selon la capacité, calibration, **équité par groupe**, comparaison des cinq modèles, limites |
 
 ## Lancer l'application
 
@@ -38,15 +39,13 @@ déconnecte donc tout le monde. C'est le moyen le plus simple de retrouver la pa
 
 ## Scénario de démonstration (5 minutes)
 
-1. Tableau de bord : les 1 227 étudiants des cohortes 2015 à 2017 sont déjà affichés au lancement.
-2. Vue « Analyse », carte « Performances des modèles » : ROC-AUC 0,902 (régression logistique) et 0,865 (noyau), Brier,
-   part des abandons détectés et des alertes justes au seuil d'alerte. Ce sont exactement les chiffres de l'évaluation finale
-   pré-enregistrée du projet de recherche.
-3. Filtres : filière, débiteur, risque, « les deux modèles divergent ». Les indicateurs et graphiques suivent.
-4. Saisie individuelle : « Remplir un exemple », notamment « À l'inscription » (aucune note), puis lecture de l'alerte,
-   des facteurs et des conseils.
-5. Import CSV : « Télécharger le fichier du jeu de test », l'importer : le tableau obtenu est identique au tableau de bord.
-6. Retour au tableau : un clic sur une ligne ouvre la fiche d'explication de l'étudiant.
+1. Suivi de cohorte : les 1 227 étudiants des cohortes 2015 à 2017 sont déjà chargés. Régler la capacité à 20 % :
+   la file contient 245 étudiants ; la carte « Cohorte au devenir connu » montre qu'elle contient 211 des 326 abandons réels.
+2. Cliquer sur « Où se concentrent les alertes » pour filtrer une filière, puis ouvrir un étudiant.
+3. Fiche : évolution du risque, facteurs en clair, pistes, étudiants au profil proche ; « Suivant dans la file ».
+4. Évaluer un étudiant : exemple « En difficulté », puis décocher les semestres pour voir le risque à l'inscription.
+5. Fiabilité du modèle : ROC-AUC 0,902, 86 % des abandons repérés au seuil, calibration, équité (boursiers), comparaison avec le noyau.
+6. Importer une cohorte : « Fichier d'exemple », l'importer : le suivi obtenu est identique.
 
 ## Organisation du code
 
@@ -54,13 +53,15 @@ déconnecte donc tout le monde. C'est le moyen le plus simple de retrouver la pa
 app.py                      création de l'application, enregistrement des volets
 auth.py                     connexion (compte unique)
 db.py                       base SQLite (sqlite3), schéma et requêtes
-moteur/scoring.py           calcul unique : nettoyage, choix du moment, valeurs absentes, deux modèles, explications
+moteur/scoring.py           calcul unique : nettoyage, choix du moment, valeurs absentes, modèles, explications, trajectoire
+moteur/langage.py           traduction des variables en langage clair, domaine et levier d'action
+moteur/fiabilite.py         évaluation sur les cohortes de test (calibration, capacité, équité)
 moteur/variables.py         variables par moment, copie conforme du projet de recherche
 moteur/noyau.py             estimateur de Nadaraya-Watson
 moteur/cohortes.py          construction d'une cohorte (jeu de test ou fichier) : une seule fonction, `importer`
-moteur/conseils.py          pistes d'accompagnement
-volets/                     un module par volet (tableau, saisie, import_csv) + api_cohortes (commune)
-templates/, static/         Tabler (Bootstrap 5), Chart.js et les polices, copiés en local : aucune dépendance externe
+moteur/conseils.py          pistes d'accompagnement, tirées des leviers
+volets/                     un module par page (tableau, fiche, saisie, import_csv, fiabilite) + api_cohortes
+templates/, static/         gabarits, une feuille de style, Chart.js et les polices en local : aucune dépendance externe
 scripts/entrainer_modeles.py  entraîne les modèles et vérifie qu'ils retrouvent l'évaluation finale
 data/                       jeu de données UCI, jeu de test (cohortes 2015 à 2017)
 models/modeles.joblib       les six modèles (deux par moment), bornes et valeurs par défaut
@@ -86,17 +87,9 @@ Le détail (intervalles de confiance, calibration, équité, limites) est dans l
 
 ## Identité visuelle
 
-Palette : bleu `#3281E0`, bleu profond `#0D3863` (barre de navigation, bandeaux), jaune pâle `#F7FFBD` (onglet actif), fonds `#F4F6FA`. Titres en Space Grotesk, texte en Inter, les deux servis depuis
-`static/vendor/fonts/` (aucun appel réseau). Formes arrondies, boutons en pilule.
-Le vert, l'orange et le rouge restent réservés aux niveaux de risque : ce sont les seules couleurs porteuses de sens.
-
-Verre dépoli (`backdrop-filter`) là où un élément flotte au-dessus d'un fond coloré : barre de navigation,
-barre de cohorte, fiche de l'étudiant, voile de chargement. Les cartes de données et les tableaux restent opaques.
-Boutons avec relief au survol et onde au clic (`static/js/effets.js`).
-Page de connexion animée : halos qui dérivent, lueur qui suit le curseur et chiffres du dispositif qui s'en échappent
-(`static/js/connexion.js`). Le voile de chargement, en verre dépoli, couvre la connexion, l'estimation d'un profil,
-l'import d'un fichier et le chargement du jeu de test.
-Tous ces effets respectent `prefers-reduced-motion` et aucun ne touche au calcul.
+Bleu nuit `#0D3863` et or `#D8B85C` pour l'identité ; titres en Space Grotesk, texte en Inter, servis depuis
+`static/vendor/fonts/` (aucun appel réseau). Le vert, l'orange et le rouge sont réservés aux niveaux de risque :
+ce sont les seules couleurs porteuses de sens. Tous les effets respectent `prefers-reduced-motion`.
 
 ## Changer l'image de fond de la page de connexion
 
@@ -109,11 +102,10 @@ et `FOND_VOILE` assombrit l'image de 0 à 90 (0 par défaut, à monter si une im
 
 ## Modèle de données (SQLite)
 
-`COHORTE (id, nom, origine, fichier, effectif, ignorees, date_creation)` 1-n
-`ETUDIANT (id, #cohorte_id, reference, filiere, genre, age, boursier, debiteur, frais_a_jour, note_s1, note_s2, devenir_reel, abandon_reel, caracteristiques)` 1-2
+`COHORTE (id, nom, origine, fichier, effectif, ignorees, proprietaire, date_creation)` 1-n
+`ETUDIANT (id, #cohorte_id, reference, filiere, genre, age, boursier, debiteur, frais_a_jour, note_s1, note_s2, inscrites_s1, validees_s1, inscrites_s2, validees_s2, facteur, domaine_facteur, devenir_reel, abandon_reel, caracteristiques)` 1-2
 `SCORE (#etudiant_id, modele, probabilite, categorie, mode_calcul)`, clé primaire (etudiant_id, modele) ; `modele` vaut `logistique` ou `noyau`, `mode_calcul` vaut `T0`, `T1` ou `T2`.
-Une base créée par la version du mémoire (modèles `rf`, modes `complet` / `precoce`) est reconstruite automatiquement au démarrage : elle ne contient que des données recalculables.
-Le jeu de test et chaque fichier importé sont des cohortes : le tableau de bord affiche l'une ou l'autre.
+Une base créée par une version précédente est reconstruite automatiquement au démarrage : elle ne contient que des données recalculables.
 `caracteristiques` conserve les valeurs fournies des 36 variables (JSON) : c'est ce qui permet de recalculer l'explication d'un étudiant à la demande.
 
 ## Tests
@@ -128,14 +120,16 @@ Ils vérifient :
   scores du tableau de bord identiques à l'évaluation finale, réglages identiques, aucune borne ni valeur par défaut issue du test ;
 - **l'exactitude des explications** : la somme des contributions redonne exactement le logit de la régression logistique,
   et le calcul à la main sur les poids des étudiants redonne exactement la probabilité du noyau, aux trois moments ;
-- l'identité tableau de bord / import (ordre des colonnes, séparateur, virgule décimale, correspondance manuelle),
-  le choix du moment (T0, T1, T2), la saisie, la base, le mode démonstration et le rendu réel dans un navigateur.
+- l'identité jeu de test chargé / fichier importé (ordre des colonnes, séparateur, virgule décimale, correspondance manuelle),
+  le choix du moment (T0, T1, T2), la saisie, la base, le mode démonstration ;
+- le parcours réel dans un navigateur : file classée par risque, capacité, filtres, fiche et étudiant suivant, saisie en direct, page de fiabilité.
 
 ## Ce que l'écran n'affiche volontairement pas
 
-L'application s'adresse à des conseillers, pas à des statisticiens. Les détails de calcul sont absents de l'écran et
-documentés dans le projet de recherche : formule du noyau et largeur de bande, contributions exactes de la régression
-logistique, imputation des variables absentes, codage des 23 variables supplémentaires.
+L'application s'adresse à des conseillers, pas à des statisticiens. Les facteurs sont traduits en phrases
+(« 2 unités validées sur 6 au 1er semestre ») avec une intensité (fort, modéré, léger) plutôt qu'en logits. Les détails de
+calcul sont documentés dans le projet de recherche : formule du noyau et largeur de bande, contributions exactes de la
+régression logistique, imputation des variables absentes, codage des 23 variables supplémentaires.
 
 ## Limites assumées
 

@@ -1,101 +1,70 @@
-/* Saisie individuelle : remplissage d'exemples, etat du formulaire, estimation.
-   Le calcul reste entierement cote serveur ; ce fichier ne fait que de l'interface. */
+/* Evaluer un etudiant : saisie guidee, estimation recalculee par le serveur a chaque modification. */
 (function () {
+  'use strict';
   const $ = (id) => document.getElementById(id);
+  const form = $('formulaire');
+  const sortie = $('resultat');
+  const ATTENTE = sortie.innerHTML;
 
-  const S1 = (e, a, v, n) => ({ 'Curricular units 1st sem (enrolled)': e, 'Curricular units 1st sem (approved)': a, 'Curricular units 1st sem (evaluations)': v, 'Curricular units 1st sem (grade)': n });
-  const S2 = (e, a, v, n) => ({ 'Curricular units 2nd sem (enrolled)': e, 'Curricular units 2nd sem (approved)': a, 'Curricular units 2nd sem (evaluations)': v, 'Curricular units 2nd sem (grade)': n });
+  const S = (s, e, v, a, n) => ({ [`Curricular units ${s} sem (enrolled)`]: e, [`Curricular units ${s} sem (evaluations)`]: v,
+    [`Curricular units ${s} sem (approved)`]: a, [`Curricular units ${s} sem (grade)`]: n });
   const EXEMPLES = {
-    fragile: Object.assign(S1(6, 2, 8, 9.5), S2(6, 1, 7, 8.0), { 'Age at enrollment': 24, 'Scholarship holder': 0, 'Debtor': 1, 'Tuition fees up to date': 0, Course: 9119 }),
-    intermediaire: Object.assign(S1(6, 4, 8, 11.5), S2(6, 4, 8, 11.0), { 'Age at enrollment': 20, 'Scholarship holder': 0, 'Debtor': 0, 'Tuition fees up to date': 1, Course: 9238 }),
-    solide: Object.assign(S1(6, 6, 7, 14.5), S2(6, 6, 7, 14.0), { 'Age at enrollment': 18, 'Scholarship holder': 1, 'Debtor': 0, 'Tuition fees up to date': 1, Course: 9500 }),
-    precoce: Object.assign(S1(6, 3, 8, 10.5), S2('', '', '', ''), { 'Age at enrollment': 19, 'Scholarship holder': 0, 'Debtor': 0, 'Tuition fees up to date': 1, Course: 9147 }),
-    inscription: Object.assign(S1('', '', '', ''), S2('', '', '', ''), { 'Age at enrollment': 27, 'Scholarship holder': 0, 'Debtor': 1, 'Tuition fees up to date': 0, Course: 9991 }),
+    inscription: { semestres: [], valeurs: { Course: 9991, 'Age at enrollment': 27, 'Scholarship holder': 0, 'Tuition fees up to date': 0, Debtor: 1 } },
+    difficulte: { semestres: ['1st', '2nd'], valeurs: { Course: 9119, 'Age at enrollment': 21, 'Scholarship holder': 0, 'Tuition fees up to date': 1, Debtor: 0,
+      ...S('1st', 6, 8, 3, 10.5), ...S('2nd', 6, 7, 2, 10.2) } },
+    solide: { semestres: ['1st', '2nd'], valeurs: { Course: 9500, 'Age at enrollment': 18, 'Scholarship holder': 1, 'Tuition fees up to date': 1, Debtor: 0,
+      ...S('1st', 7, 8, 7, 14.2), ...S('2nd', 7, 7, 7, 13.8) } },
   };
 
-  const champs = Array.from(document.querySelectorAll('#formulaire [name]'));
-  const champsS2 = champs.filter((c) => c.name.includes('2nd sem'));
-  const champsS1 = champs.filter((c) => c.name.includes('1st sem'));
+  function semestreActif(s) { return form.querySelector(`[data-bascule="${s}"]`).checked; }
 
-  /* --- etat du formulaire : progression et portee de l'estimation --- */
-  function majEtat() {
-    const remplis = champs.filter((c) => String(c.value).trim() !== '').length;
-    const barre = $('progression-barre');
-    if (barre) barre.style.width = (remplis / champs.length * 100) + '%';
-    const texte = $('progression-texte');
-    if (texte) texte.textContent = `${remplis} champ${remplis > 1 ? 's' : ''} sur ${champs.length}`;
-
-    const etat = $('etat-mode'), mot = $('etat-mode-texte');
-    if (!etat || !mot) return;
-    // le modele est choisi selon l'information fournie : inscription, fin du 1er ou du 2e semestre
-    const vide = (liste) => liste.every((c) => String(c.value).trim() === '');
-    if (!vide(champsS2)) { etat.dataset.mode = 'complet'; mot.textContent = 'Modèle de fin du 2e semestre'; }
-    else if (!vide(champsS1)) { etat.dataset.mode = 'premier'; mot.textContent = 'Modèle de fin du 1er semestre'; }
-    else { etat.dataset.mode = 'vide'; mot.textContent = "Modèle de l'inscription"; }
-  }
-  $('formulaire').addEventListener('input', majEtat);
-  $('formulaire').addEventListener('change', majEtat);
-
-  /* --- menu des exemples : il remplit le formulaire, sans lancer le calcul --- */
-  const menu = $('liste-exemple'), bouton = $('bouton-exemple');
-  if (menu && bouton) {
-    bouton.addEventListener('click', () => {
-      const ouvert = menu.classList.toggle('on');
-      bouton.setAttribute('aria-expanded', String(ouvert));
-    });
-    document.addEventListener('click', (e) => {
-      if (!menu.contains(e.target) && !bouton.contains(e.target)) {
-        menu.classList.remove('on'); bouton.setAttribute('aria-expanded', 'false');
-      }
-    });
-    menu.querySelectorAll('[data-exemple]').forEach((a) => a.addEventListener('click', () => {
-      const valeurs = EXEMPLES[a.dataset.exemple];
-      Object.keys(valeurs).forEach((k) => {
-        const el = document.querySelector(`[name="${k}"]`); if (el) el.value = valeurs[k];
-      });
-      menu.classList.remove('on'); bouton.setAttribute('aria-expanded', 'false');
-      $('erreur').hidden = true;
-      majEtat();
-      champs[0].focus();
-    }));
+  function majEtapes() {
+    const s1 = semestreActif('1st');
+    const b2 = form.querySelector('[data-bascule="2nd"]');
+    if (!s1 && b2.checked) b2.checked = false;
+    b2.disabled = !s1;
+    form.querySelectorAll('[data-semestre]').forEach((sec) => sec.classList.toggle('inactive', !semestreActif(sec.dataset.semestre)));
   }
 
-  const effacer = $('effacer');
-  if (effacer) effacer.addEventListener('click', () => {
-    champs.forEach((c) => { c.value = c.tagName === 'SELECT' ? c.querySelector('option').value : ''; });
-    $('resultat').hidden = true; $('attente').hidden = false; $('erreur').hidden = true;
-    $('deux-colonnes').dataset.resultat = 'visible';
-    majEtat();
-  });
+  function donnees() {
+    const d = {};
+    new FormData(form).forEach((v, k) => {
+      if (String(v).trim() === '') return;
+      if (k.includes(' sem ') && !semestreActif(k.includes('1st') ? '1st' : '2nd')) return;
+      d[k] = v;
+    });
+    return d;
+  }
 
-  /* --- le panneau de resultat se replie, le formulaire prend toute la largeur --- */
-  const colonnes = $('deux-colonnes');
-  const fermer = $('fermer-resultat');
-  if (fermer) fermer.addEventListener('click', () => {
-    colonnes.dataset.resultat = 'masque';
-    document.querySelector('#formulaire button[type=submit]').focus();
-  });
-
-  $('formulaire').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    $('erreur').hidden = true;
-    const donnees = {};
-    new FormData(e.target).forEach((v, k) => { donnees[k] = v; });
-    if (window.Chargement) window.Chargement.afficher('Estimation en cours');
-    try {
-      const res = await fetch('/api/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(donnees) });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.erreur || 'Erreur du serveur');
-      $('attente').hidden = true; $('resultat').hidden = false;
-      colonnes.dataset.resultat = 'visible';   // une nouvelle estimation fait revenir le panneau
-      Resultat.rendre($('resultat'), json, { noteEstimees: false });
-    } catch (err) {
-      $('erreur').textContent = err.message; $('erreur').hidden = false;
-      colonnes.dataset.resultat = 'visible';
-    } finally {
-      if (window.Chargement) window.Chargement.masquer();
+  let minuterie = null, compteur = 0;
+  async function estimer() {
+    const d = donnees();
+    if (!Object.keys(d).length) { sortie.innerHTML = ATTENTE; return; }
+    const numero = ++compteur;
+    const res = await fetch('/api/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) });
+    const json = await res.json();
+    if (numero !== compteur) return; // une saisie plus recente est deja en cours
+    if (!res.ok) {
+      sortie.innerHTML = `<div class="erreur-saisie" role="alert">${Commun.echapper(json.erreur || 'Erreur du serveur')}</div>`;
+      return;
     }
-  });
+    Fiche.rendre(sortie, json, { compact: true });
+  }
+  const planifier = () => { clearTimeout(minuterie); minuterie = setTimeout(estimer, 250); };
 
-  majEtat();
+  form.addEventListener('input', planifier);
+  form.addEventListener('change', (e) => { if (e.target.dataset.bascule) majEtapes(); planifier(); });
+
+  function remplir(exemple) {
+    form.reset();
+    form.querySelectorAll('[data-bascule]').forEach((b) => { b.checked = exemple.semestres.includes(b.dataset.bascule); });
+    Object.entries(exemple.valeurs).forEach(([k, v]) => {
+      const champs = form.querySelectorAll(`[name="${CSS.escape(k)}"]`);
+      champs.forEach((c) => { if (c.type === 'radio') c.checked = String(c.value) === String(v); else c.value = v; });
+    });
+    majEtapes(); estimer();
+  }
+  document.querySelectorAll('[data-exemple]').forEach((b) => b.addEventListener('click', () => remplir(EXEMPLES[b.dataset.exemple])));
+  $('effacer').addEventListener('click', () => { form.reset(); majEtapes(); sortie.innerHTML = ATTENTE; });
+  majEtapes();
 })();

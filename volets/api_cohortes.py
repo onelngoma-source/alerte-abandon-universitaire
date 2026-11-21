@@ -8,6 +8,7 @@ from flask import Blueprint, current_app, jsonify
 
 import db
 from auth import MODE_DEMO, connexion_requise, proprietaire_courant
+from moteur import fiabilite
 from moteur.conseils import generer_conseils
 from moteur.referentiels import CHAMPS_FORMULAIRE, CHAMPS_OUI_NON, DEVENIRS, FILIERES, LIBELLES_CHAMPS, SEUIL_ALERTE
 
@@ -119,8 +120,10 @@ def fiche(etudiant_id):
     cohorte = db.lire_cohorte(e["cohorte_id"], proprietaire_courant())
     if cohorte is None:
         return jsonify({"erreur": "Étudiant introuvable."}), 404
+    avertissements = fiabilite.avertissements(current_app.moteur, valeurs)
     return jsonify({
-        "reference": e["reference"], "cohorte": cohorte["nom"],
+        "reference": e["reference"], "cohorte": cohorte["nom"], "cohorte_id": cohorte["id"],
+        "avertissements": avertissements,
         "devenir": DEVENIRS.get(e["devenir_reel"]) or ("Abandon" if reel == 1 else "Pas d'abandon" if reel == 0 else None),
         "abandon_reel": reel, "verification": verification,
         "resultat": resultat, "conseils": generer_conseils(valeurs), "profil": profil,

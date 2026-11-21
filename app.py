@@ -1,9 +1,11 @@
 """Application Flask : dispositif d'alerte precoce du risque d'abandon universitaire.
 
-Trois volets, chacun dans son module (dossier volets/) :
-  1. tableau de bord : les etudiants du jeu de TEST, avec filtres et indicateurs ;
-  2. saisie individuelle : un etudiant, un formulaire, une explication ;
-  3. import CSV : un fichier produit le meme tableau que le tableau de bord.
+Organisee autour du travail d'un conseiller (dossier volets/) :
+  1. suivi de cohorte : la file des etudiants a accompagner en priorite, selon la capacite disponible ;
+  2. fiche etudiant : le risque, son evolution, ce qui le fait monter ou baisser, des pistes d'action ;
+  3. evaluer un etudiant : saisie guidee, estimation recalculee a chaque modification ;
+  4. importer une cohorte : un fichier CSV, puis le meme suivi ;
+  5. fiabilite du modele : evaluation sur des cohortes jamais vues, calibration, equite, approche a noyau.
 Le calcul est unique (dossier moteur/) et les donnees sont dans une base SQLite (db.py).
 """
 import os
@@ -16,7 +18,7 @@ import auth
 import db
 from moteur import cohortes
 from moteur.scoring import Moteur
-from volets import api_cohortes, import_csv, saisie, tableau
+from volets import api_cohortes, fiabilite, fiche, import_csv, saisie, tableau
 
 NOM_JEU_DE_TEST = "Cohortes 2015 à 2017 (test)"
 
@@ -55,6 +57,8 @@ def creer_application(moteur: Moteur | None = None) -> Flask:
     app.register_blueprint(tableau.bp)
     app.register_blueprint(saisie.bp)
     app.register_blueprint(import_csv.bp)
+    app.register_blueprint(fiche.bp)
+    app.register_blueprint(fiabilite.bp)
     app.register_blueprint(api_cohortes.bp)
     app.register_blueprint(api_cohortes.bp_etudiants)
 

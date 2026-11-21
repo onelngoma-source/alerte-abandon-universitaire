@@ -2,6 +2,7 @@
 from flask import Blueprint, current_app, jsonify, render_template, request
 
 from auth import connexion_requise
+from moteur import fiabilite
 from moteur.conseils import generer_conseils
 from moteur.referentiels import CHAMPS_FORMULAIRE, CHAMPS_OUI_NON, FILIERES, LIBELLES_CHAMPS
 
@@ -26,4 +27,5 @@ def predire():
     except (ValueError, TypeError) as e:
         return jsonify({"erreur": str(e)}), 400
     resultat["conseils"] = generer_conseils(donnees)
+    resultat["avertissements"] = fiabilite.avertissements(current_app.moteur, donnees)
     return jsonify(resultat)

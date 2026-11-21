@@ -1,6 +1,5 @@
-"""Rendu reel dans un navigateur (Chromium) : le tableau de bord et l'import affichent le meme bloc, a l'identique."""
+"""Rendu reel dans un navigateur (Chromium) : le parcours d'un conseiller, de la file d'accompagnement a la fiche."""
 import threading
-import re
 from pathlib import Path
 
 import pytest
@@ -11,11 +10,6 @@ from werkzeug.serving import make_server  # noqa: E402
 from conftest import RACINE  # noqa: E402
 
 CHROMIUM = Path("/opt/pw-browsers/chromium")
-
-
-def sans_identifiants(html: str) -> str:
-    """Les identifiants de lignes sont des cles de base de donnees, propres a chaque cohorte : on les retire."""
-    return re.sub(r' data-id="\d+"', "", html)
 
 
 @pytest.fixture
@@ -47,100 +41,85 @@ def page(serveur):
         assert erreurs == []
 
 
-def test_demarrage_vide_puis_chargement_du_jeu_de_test(page):
-    pg, base, _ = page
-    pg.goto(base + "/tableau")
-    assert pg.is_visible("#etat-vide") and pg.is_hidden("#cohorte-vue")
+def charger(pg, serveur):
+    pg.goto(serveur + "/tableau")
     pg.click("#btn-charger-test-vide")
-    pg.wait_for_selector("#cohorte-vue:not([hidden])")
-    assert pg.inner_text("[data-kpi=effectif]").replace(" ", "").replace(" ", "").replace(" ", "") == "1227"
-    assert pg.inner_text("[data-kpi=abandons]").replace(" ", "").replace(" ", "").replace(" ", "") == "326"
+    pg.wait_for_selector("#lignes tr")
 
 
-def test_tableau_de_bord_et_import_ont_le_meme_rendu(page):
-    pg, base, _ = page
-    pg.goto(base + "/tableau")
-    pg.click("#btn-charger-test-vide"); pg.wait_for_selector("#cohorte-vue:not([hidden])")
-    pg.wait_for_timeout(500)
-    rendu_tableau = sans_identifiants(pg.inner_html("#cohorte-vue"))
-    taille_tableau = {k: v for k, v in pg.locator("#cohorte-vue").bounding_box().items() if k in ("width", "height")}
-
-    pg.goto(base + "/import")
-    pg.set_input_files("#fichier", str(RACINE / "data" / "jeu_de_test_2015_2017.csv"))
-    pg.click("#btn-analyser")
-    pg.wait_for_selector("#cohorte-vue:not([hidden])")
-    pg.wait_for_timeout(500)
-    assert sans_identifiants(pg.inner_html("#cohorte-vue")) == rendu_tableau  # meme HTML, apres rendu
-    # memes dimensions a l'ecran (une comparaison au pixel serait faussee par le decalage vertical du bloc,
-    # place plus bas sur la page d'import : l'anticrenelage du texte differe d'un demi-pixel)
-    taille_import = {k: v for k, v in pg.locator("#cohorte-vue").bounding_box().items() if k in ("width", "height")}
-    assert taille_import == taille_tableau
+def test_demarrage_vide_puis_chargement_du_jeu_de_test(page):
+    pg, serveur, _ = page
+    pg.goto(serveur + "/tableau")
+    assert pg.is_visible("#etat-vide")
+    charger(pg, serveur)
+    assert pg.inner_text("#kpi-effectif").replace("\u202f", " ") == "1 227"
+    assert pg.locator("#lignes tr").count() == 25
 
 
-def test_un_filtre_change_le_tableau_et_les_indicateurs(page):
-    pg, base, _ = page
-    pg.goto(base + "/tableau")
-    pg.click("#btn-charger-test-vide"); pg.wait_for_selector("#cohorte-vue:not([hidden])")
-    pg.select_option("[data-filtre=c_ml]", "eleve")
-    pg.select_option("[data-filtre=debiteur]", "1")
-    pg.wait_for_timeout(300)
-    effectif = int(pg.inner_text("[data-kpi=effectif]").replace(" ", "").replace(" ", "").replace(" ", ""))
-    assert 0 < effectif < 345
-    assert "Élevé" in pg.inner_text("[data-role=corps] tr:first-child")
-    assert pg.inner_text("[data-kpi=eleve-ml]").strip() == str(effectif)
+def test_la_file_est_classee_par_risque_et_suit_la_capacite(page):
+    pg, serveur, _ = page
+    charger(pg, serveur)
+    risques = [int(x.split()[0]) for x in pg.locator("#lignes .pct").all_inner_texts()]
+    assert risques == sorted(risques, reverse=True)
+    pg.check("#prioritaires")
+    assert "245 étudiants" in pg.inner_text("#compte").replace("\u202f", " ")
+    pg.fill("#capacite", "10")
+    pg.dispatch_event("#capacite", "input")
+    assert "123 étudiants" in pg.inner_text("#compte").replace("\u202f", " ")
+    assert "123 étudiants" in pg.inner_text("#capacite-phrase").replace("\u202f", " ")
 
 
-def test_clic_sur_une_ligne_ouvre_la_fiche_d_explication(page):
-    pg, base, _ = page
-    pg.goto(base + "/tableau")
-    pg.click("#btn-charger-test-vide"); pg.wait_for_selector("#cohorte-vue:not([hidden])")
-    reference = pg.inner_text("[data-role=corps] tr:nth-child(2) td:first-child").split("\n")[0].strip()
-    pg.click("[data-role=corps] tr:nth-child(2)")
-    pg.wait_for_selector("[data-role=fiche-contenu]:not([hidden])")
-    assert pg.inner_text("[data-role=fiche-titre]") == reference
-    assert pg.inner_text("[data-role=fiche-devenir]") in ("Abandon", "Diplômé", "Inscrit")
-    assert len(pg.query_selector_all("[data-role=facteurs] .list-group-item")) == 5
-    assert pg.inner_text("[data-role=p-ml]") != "-"
-    assert len(pg.query_selector_all("[data-role=fiche-profil] .list-group-item")) == 13
+def test_filtres_par_niveau_et_par_filiere(page):
+    pg, serveur, _ = page
+    charger(pg, serveur)
+    pg.click("#niveaux [data-niveau=faible]")
+    assert all("Faible" in b for b in pg.locator("#lignes .risque-cellule .badge").all_inner_texts())
+    pg.click("#niveaux [data-niveau=tous]")
+    pg.click("#par-filiere [data-filiere='Agronomie']")
+    assert set(pg.locator("#lignes .etudiant span").all_inner_texts()) == {"Agronomie"}
 
 
-def test_la_fiche_explique_le_noyau_par_ses_voisins(page):
-    pg, base, _ = page
-    pg.goto(base + "/tableau")
-    pg.click("#btn-charger-test-vide"); pg.wait_for_selector("#cohorte-vue:not([hidden])")
-    pg.click("[data-role=corps] tr:nth-child(2)")
-    pg.wait_for_selector("[data-role=fiche-contenu]:not([hidden])")
-    assert len(pg.query_selector_all("[data-role=voisins-lignes] tr")) == 5   # cinq profils, pas soixante-quinze
-    assert "ont abandonné" in pg.inner_text("[data-role=voisins-bas]")
-    # l'ecran reste sobre : aucun jargon technique dans la fiche
-    texte = pg.inner_text("[data-role=fiche-contenu]").lower()
-    for mot in ("shap", "smote", "nadaraya", "gaussien", "shapley", "largeur de bande", "75 profils"):
-        assert mot not in texte
+def test_un_clic_ouvre_la_fiche_et_permet_de_passer_au_suivant(page):
+    pg, serveur, _ = page
+    charger(pg, serveur)
+    premier = pg.inner_text("#lignes tr:first-child .etudiant b")
+    pg.click("#lignes tr:first-child")
+    pg.wait_for_selector(".risque-grand")
+    assert pg.inner_text("h1") == premier
+    assert pg.locator(".facteurs.hausse li").count() >= 1
+    assert pg.is_visible(".pistes") and pg.is_visible(".pastilles-voisins")
+    assert pg.locator(".trajectoire .etape-traj").count() == 3
+    pg.click("#suivant")
+    pg.wait_for_selector(".risque-grand")
+    assert pg.inner_text("h1") != premier
 
 
-def test_graphique_par_filiere_suit_les_filtres_et_le_modele(page):
-    pg, base, _ = page
-    pg.goto(base + "/tableau")
-    pg.click("#btn-charger-test-vide"); pg.wait_for_selector("#cohorte-vue:not([hidden])")
-    etiquettes = lambda: pg.evaluate("Chart.getChart(document.querySelector('[data-role=graphique-filiere]')).data.labels")
-    comptes = lambda: pg.evaluate("Chart.getChart(document.querySelector('[data-role=graphique-filiere]')).data.datasets.map(d => d.counts)")
-    assert len(etiquettes()) == 17
-    total = sum(sum(c) for c in comptes())
-    assert total == 1227
-    pg.select_option("[data-role=modele-filiere]", "noyau")
-    assert sum(sum(c) for c in comptes()) == 1227
-    pg.select_option("[data-filtre=filiere]", index=1)
-    pg.wait_for_timeout(200)
-    assert len(etiquettes()) == 1
+def test_la_saisie_estime_en_direct(page):
+    pg, serveur, _ = page
+    pg.goto(serveur + "/saisie")
+    pg.click("[data-exemple=difficulte]")
+    pg.wait_for_selector("#resultat .risque-grand")
+    assert "fin du 2e semestre" in pg.inner_text("#resultat .meta-risque")
+    pg.uncheck("[data-bascule='1st']")
+    pg.wait_for_function("document.querySelector('#resultat .meta-risque').innerText.includes(\"l'inscription\")")
+    assert pg.locator("#resultat .etape-traj.future").count() == 2
+
+
+def test_la_page_fiabilite_retrouve_l_evaluation(page):
+    pg, serveur, _ = page
+    pg.goto(serveur + "/fiabilite")
+    pg.wait_for_selector("#table-comparaison tr")
+    assert "0,902" in pg.inner_text("#kpis")
+    assert "Boursiers" in pg.inner_text("#table-equite")
+    assert pg.locator("#table-moments tbody tr").count() == 3
 
 
 def test_les_pages_restent_sobres_sans_jargon(page):
-    """Les conseillers n'ont pas a lire de vocabulaire technique : il vit dans la documentation, pas dans l'application."""
-    pg, base, _ = page
-    interdits = ("smote", "nadaraya", "gaussien", "shapley", "imputation", "mode précoce", "seuil 0,5", "entraîné")
-    for chemin in ("/tableau", "/saisie", "/import"):
-        pg.goto(base + chemin)
-        pg.wait_for_timeout(200)
-        texte = pg.inner_text("body").lower()
-        for mot in interdits:
-            assert mot not in texte, (chemin, mot)
+    """Le conseiller ne voit ni logit, ni nom de variable anglais, ni code technique de modele."""
+    pg, serveur, _ = page
+    charger(pg, serveur)
+    pg.click("#lignes tr:first-child")
+    pg.wait_for_selector(".risque-grand")
+    texte = pg.inner_text("main")
+    for mot in ("logit", "Curricular", "Tuition", "T0", "T1", "T2", "p_ml", "undefined", "NaN"):
+        assert mot not in texte, mot

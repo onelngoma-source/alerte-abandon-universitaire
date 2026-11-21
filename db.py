@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS etudiant (
     frais_a_jour  INTEGER,
     note_s1       REAL,
     note_s2       REAL,
+    inscrites_s1  INTEGER,
+    validees_s1   INTEGER,
+    inscrites_s2  INTEGER,
+    validees_s2   INTEGER,
+    facteur       TEXT,                       -- facteur qui pese le plus vers l'abandon, en clair
+    domaine_facteur TEXT,
     devenir_reel  TEXT CHECK (devenir_reel IN ('Dropout', 'Graduate', 'Enrolled')),
     abandon_reel  INTEGER CHECK (abandon_reel IN (0, 1)),
     caracteristiques TEXT           -- JSON : valeurs des variables fournies (sert a la fiche d'explication)
@@ -50,7 +56,8 @@ CREATE TABLE IF NOT EXISTS score (
 
 REQUETE_LIGNES = """
 SELECT e.id, e.reference, e.filiere, e.genre, e.age, e.boursier, e.debiteur, e.frais_a_jour,
-       e.note_s1, e.note_s2, e.devenir_reel, e.abandon_reel,
+       e.note_s1, e.note_s2, e.inscrites_s1, e.validees_s1, e.inscrites_s2, e.validees_s2,
+       e.facteur, e.domaine_facteur, e.devenir_reel, e.abandon_reel,
        MAX(CASE WHEN s.modele = 'noyau' THEN s.probabilite END) AS p_noyau,
        MAX(CASE WHEN s.modele = 'noyau' THEN s.categorie   END) AS c_noyau,
        MAX(CASE WHEN s.modele = 'logistique' THEN s.probabilite END) AS p_ml,
@@ -86,7 +93,9 @@ def initialiser() -> None:
         # ses scores ne correspondent plus aux modeles actuels. Elle ne contient que des donnees
         # recalculables (jeu de test et imports) : on la reconstruit.
         ancien = c.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'score'").fetchone()
-        if ancien and "'rf'" in ancien["sql"]:
+        colonnes_avant = {r["name"] for r in c.execute("PRAGMA table_info(etudiant)")}
+        if (ancien and "'rf'" in ancien["sql"]) or (colonnes_avant and "facteur" not in colonnes_avant):
+            # base d'une version precedente : tout y est recalculable (jeu de test et imports)
             c.executescript("DROP TABLE score; DROP TABLE etudiant; DROP TABLE cohorte;")
         c.executescript(SCHEMA)
         colonnes = {r["name"] for r in c.execute("PRAGMA table_info(etudiant)")}
@@ -139,10 +148,13 @@ def creer_cohorte(nom: str, origine: str, fichier: str | None, etudiants: list[d
         for e in etudiants:
             cur = c.execute(
                 "INSERT INTO etudiant (cohorte_id, reference, filiere, genre, age, boursier, debiteur, frais_a_jour, "
-                "note_s1, note_s2, devenir_reel, abandon_reel, caracteristiques) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "note_s1, note_s2, inscrites_s1, validees_s1, inscrites_s2, validees_s2, facteur, domaine_facteur, "
+                "devenir_reel, abandon_reel, caracteristiques) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (cohorte_id, e["reference"], e["filiere"], e["genre"], e["age"], e["boursier"], e["debiteur"],
-                 e["frais_a_jour"], e["note_s1"], e["note_s2"], e["devenir_reel"], e["abandon_reel"],
-                 e.get("caracteristiques")))
+                 e["frais_a_jour"], e["note_s1"], e["note_s2"], e.get("inscrites_s1"), e.get("validees_s1"),
+                 e.get("inscrites_s2"), e.get("validees_s2"), e.get("facteur"), e.get("domaine_facteur"),
+                 e["devenir_reel"], e["abandon_reel"], e.get("caracteristiques")))
             etudiant_id = cur.lastrowid
             c.executemany(
                 "INSERT INTO score (etudiant_id, modele, probabilite, categorie, mode_calcul) VALUES (?, ?, ?, ?, ?)",

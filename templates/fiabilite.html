@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block titre %}Fiabilité du modèle · Alerte précoce{% endblock %}
+{% block contenu %}
+<header class="entete-page">
+  <div class="titres">
+    <div class="sur-titre">Fiabilité du modèle</div>
+    <h1>Jusqu'où faire confiance à l'estimation&nbsp;?</h1>
+    <p class="sous-titre">Le modèle a été construit sur les cohortes 2008 à 2014, puis évalué une seule fois sur les
+      <b id="intro-effectif">1 227</b> étudiants des cohortes 2015 à 2017, qu'il n'avait jamais vus. Tout ce qui suit est
+      recalculé sur ces cohortes avec les modèles de l'application.</p>
+  </div>
+  <div class="actions"><a class="btn" href="https://github.com/onelngoma-source/abandon-universitaire" target="_blank" rel="noopener">Projet de recherche ↗</a></div>
+</header>
+
+<section class="indicateurs" id="kpis"></section>
+
+<div class="grille" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); margin-bottom:16px" id="ligne-1">
+  <section class="carte">
+    <div class="carte-tete"><h2>Si nous accompagnons une part des étudiants…</h2></div>
+    <div class="carte-corps">
+      <p class="discret petit" style="margin-bottom:10px">Part des abandons réels repérés en accompagnant les étudiants les plus à risque d'abord.</p>
+      <div class="graphique"><canvas id="graphique-capacite" aria-label="Courbe de capacité"></canvas></div>
+      <div class="legende-modeles" style="margin-top:10px"><span><i style="background:#0D3863"></i>Fin du 2e semestre</span><span><i style="background:#3281E0"></i>Fin du 1er semestre</span><span><i style="background:#D8B85C"></i>Inscription</span><span><i style="background:#CED6DF"></i>Au hasard</span></div>
+      <p class="texte-court" id="phrase-capacite" style="margin-top:12px"></p>
+    </div>
+  </section>
+  <section class="carte">
+    <div class="carte-tete"><h2>Le seuil d'alerte</h2></div>
+    <div class="carte-corps">
+      <p class="texte-court">Manquer un étudiant qui abandonne coûte bien plus cher que d'accompagner pour rien un étudiant qui
+        aurait réussi. Nous avons retenu un rapport de <b>5 pour 1</b>. Il est alors rentable d'alerter dès que :</p>
+      <div class="formule">risque ≥ 1 / (1 + 5) = 1/6 ≈ 16,7 %</div>
+      <p class="texte-court">Ce calcul n'a de sens que si les probabilités sont justes. C'est le cas : quand le modèle annonce
+        20 %, environ 20 % de ces étudiants abandonnent réellement (graphique ci-dessous).</p>
+      <table class="simple" id="table-moments" style="margin-top:14px"></table>
+    </div>
+  </section>
+</div>
+
+<div class="grille" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr); margin-bottom:16px" id="ligne-2">
+  <section class="carte">
+    <div class="carte-tete"><h2>Des probabilités justes</h2></div>
+    <div class="carte-corps">
+      <p class="discret petit" style="margin-bottom:10px">Étudiants de test répartis en dix groupes selon le risque annoncé (fin du 2e semestre).
+        Plus les points sont près de la diagonale, plus l'annonce est fidèle.</p>
+      <div class="graphique"><canvas id="graphique-calibration" aria-label="Calibration"></canvas></div>
+      <div class="legende-modeles" style="margin-top:10px"><span><i style="background:#0D3863"></i>Régression logistique (retenue)</span><span><i style="background:#D8B85C"></i>Approche à noyau</span></div>
+    </div>
+  </section>
+  <section class="carte">
+    <div class="carte-tete"><h2>Le même outil pour tous&nbsp;?</h2></div>
+    <div class="carte-corps">
+      <p class="discret petit">Part des abandons repérés au seuil d'alerte, selon le groupe (fin du 2e semestre).
+        Les écarts marqués sont soulignés.</p>
+      <div class="tableau-wrap"><table class="simple" id="table-equite"></table></div>
+      <div class="encart or" style="margin-top:14px" id="encart-equite"></div>
+    </div>
+  </section>
+</div>
+
+<div class="grille" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)" id="ligne-3">
+  <section class="carte">
+    <div class="carte-tete"><h2>Pourquoi la régression logistique</h2><span class="discret">ROC-AUC sur les cohortes 2015 à 2017</span></div>
+    <div class="carte-corps">
+      <div class="tableau-wrap"><table class="simple" id="table-comparaison"></table></div>
+      <p class="texte-court" style="margin-top:14px">Une fois tous les modèles réglés et évalués de la même façon, la forêt aléatoire et
+        XGBoost ne font pas mieux : le plus simple l'emporte, ses probabilités sont justes sans correction et chacune de ses
+        estimations s'explique exactement, variable par variable. L'approche à noyau de Nadaraya-Watson, sujet du mémoire,
+        a été corrigée (vraie pondération, largeur de bande réglée) : elle gagne 2 à 5 points sur la version d'origine mais reste
+        significativement en dessous (bootstrap apparié, 2 000 tirages). Dans l'application, elle sert à montrer, sur chaque fiche,
+        les étudiants passés au profil le plus proche.</p>
+    </div>
+  </section>
+  <section class="carte">
+    <div class="carte-tete"><h2>Limites à garder en tête</h2></div>
+    <div class="carte-corps">
+      <ul class="limites">
+        <li>Les données viennent d'un établissement portugais (jeu UCI, 2008 à 2017). Avant un usage réel ailleurs, le modèle doit être
+          réévalué sur les étudiants de l'établissement.</li>
+        <li>À l'inscription, l'estimation est encore grossière : beaucoup d'étudiants passent le seuil. Elle s'affine nettement dès la fin
+          du 1er semestre.</li>
+        <li>Les abandons des étudiants boursiers sont moins bien repérés : un risque faible chez un boursier ne garantit rien.</li>
+        <li>Le modèle repère des associations, pas des causes. Les facteurs affichés orientent l'entretien, ils ne le remplacent pas.</li>
+        <li>Une alerte sert à proposer un accompagnement, jamais à prendre une décision défavorable pour l'étudiant.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fiabilite.js') }}"></script>
+{% endblock %}
