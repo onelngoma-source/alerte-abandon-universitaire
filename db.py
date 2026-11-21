@@ -1,13 +1,14 @@
 """Acces a la base SQLite (module standard sqlite3, sans ORM).
 
-Modele logique : COHORTE 1-n ETUDIANT 1-2 SCORE (un score par modele : noyau et rf).
-Une cohorte est soit le jeu de test UCI (1 328 etudiants), soit un fichier CSV importe.
+Modele logique : COHORTE 1-n ETUDIANT 1-2 SCORE (un score par modele : noyau et logistique).
+Une cohorte est soit le jeu de test (cohortes 2015 a 2017, 1 227 etudiants), soit un fichier CSV importe.
 """
 import os
 import sqlite3
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent
+FICHIER_JEU_DE_TEST = "jeu_de_test_2015_2017.csv"  # cohortes 2015 a 2017, jamais vues a l'entrainement
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS cohorte (
@@ -39,10 +40,10 @@ CREATE TABLE IF NOT EXISTS etudiant (
 CREATE INDEX IF NOT EXISTS idx_etudiant_cohorte ON etudiant(cohorte_id);
 CREATE TABLE IF NOT EXISTS score (
     etudiant_id   INTEGER NOT NULL REFERENCES etudiant(id) ON DELETE CASCADE,
-    modele        TEXT    NOT NULL CHECK (modele IN ('noyau', 'rf')),
+    modele        TEXT    NOT NULL CHECK (modele IN ('noyau', 'logistique')),
     probabilite   REAL    NOT NULL,
     categorie     TEXT    NOT NULL CHECK (categorie IN ('faible', 'moyen', 'eleve')),
-    mode_calcul   TEXT    NOT NULL CHECK (mode_calcul IN ('complet', 'precoce')),
+    mode_calcul   TEXT    NOT NULL CHECK (mode_calcul IN ('T0', 'T1', 'T2')),
     PRIMARY KEY (etudiant_id, modele)
 );
 """
@@ -52,8 +53,8 @@ SELECT e.id, e.reference, e.filiere, e.genre, e.age, e.boursier, e.debiteur, e.f
        e.note_s1, e.note_s2, e.devenir_reel, e.abandon_reel,
        MAX(CASE WHEN s.modele = 'noyau' THEN s.probabilite END) AS p_noyau,
        MAX(CASE WHEN s.modele = 'noyau' THEN s.categorie   END) AS c_noyau,
-       MAX(CASE WHEN s.modele = 'rf'    THEN s.probabilite END) AS p_ml,
-       MAX(CASE WHEN s.modele = 'rf'    THEN s.categorie   END) AS c_ml,
+       MAX(CASE WHEN s.modele = 'logistique' THEN s.probabilite END) AS p_ml,
+       MAX(CASE WHEN s.modele = 'logistique' THEN s.categorie   END) AS c_ml,
        MAX(s.mode_calcul) AS mode
 FROM etudiant e JOIN score s ON s.etudiant_id = e.id
 WHERE e.cohorte_id = ?
@@ -81,6 +82,12 @@ def connecter() -> sqlite3.Connection:
 
 def initialiser() -> None:
     with connecter() as c:
+        # Base creee par la version du memoire (modeles noyau / rf, modes complet / precoce) :
+        # ses scores ne correspondent plus aux modeles actuels. Elle ne contient que des donnees
+        # recalculables (jeu de test et imports) : on la reconstruit.
+        ancien = c.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'score'").fetchone()
+        if ancien and "'rf'" in ancien["sql"]:
+            c.executescript("DROP TABLE score; DROP TABLE etudiant; DROP TABLE cohorte;")
         c.executescript(SCHEMA)
         colonnes = {r["name"] for r in c.execute("PRAGMA table_info(etudiant)")}
         if "caracteristiques" not in colonnes:  # base creee par une version precedente
@@ -140,7 +147,7 @@ def creer_cohorte(nom: str, origine: str, fichier: str | None, etudiants: list[d
             c.executemany(
                 "INSERT INTO score (etudiant_id, modele, probabilite, categorie, mode_calcul) VALUES (?, ?, ?, ?, ?)",
                 [(etudiant_id, "noyau", e["p_noyau"], e["c_noyau"], e["mode"]),
-                 (etudiant_id, "rf", e["p_ml"], e["c_ml"], e["mode"])])
+                 (etudiant_id, "logistique", e["p_ml"], e["c_ml"], e["mode"])])
         return cohorte_id
 
 
@@ -150,7 +157,7 @@ def lire_etudiant(etudiant_id: int) -> dict | None:
         r = c.execute(
             "SELECT e.id, e.cohorte_id, e.reference, e.devenir_reel, e.abandon_reel, e.caracteristiques, "
             "MAX(CASE WHEN s.modele = 'noyau' THEN s.probabilite END) AS p_noyau, "
-            "MAX(CASE WHEN s.modele = 'rf' THEN s.probabilite END) AS p_ml, MAX(s.mode_calcul) AS mode "
+            "MAX(CASE WHEN s.modele = 'logistique' THEN s.probabilite END) AS p_ml, MAX(s.mode_calcul) AS mode "
             "FROM etudiant e JOIN score s ON s.etudiant_id = e.id WHERE e.id = ? GROUP BY e.id", (etudiant_id,)).fetchone()
         return dict(r) if r else None
 

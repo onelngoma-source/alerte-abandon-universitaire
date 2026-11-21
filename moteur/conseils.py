@@ -36,7 +36,7 @@ def generer_conseils(reponses: dict) -> list[dict]:
     if debiteur:
         conseils.append({"type": "financier", "message":
             "Situation de débiteur : orienter vers le service financier pour un plan d'apurement "
-            "(facteur associé à 62 % d'abandon dans les données observées)."})
+            "(71 % d'abandon chez les étudiants débiteurs des cohortes 2008 à 2014)."})
     if not boursier and not frais_a_jour:
         conseils.append({"type": "financier", "message":
             "Pas de bourse et retard de paiement des frais : évaluer l'éligibilité à une aide financière d'urgence."})

@@ -10,20 +10,28 @@
     const carte = $('carte-voisins');
     if (!v || !v.plus_proches.length) { carte.hidden = true; return; }
     carte.hidden = false;
-    $('voisins-entetes').innerHTML = '<tr><th>#</th><th>Profil</th><th>Abandon</th>'
+    $('voisins-entetes').innerHTML = '<tr><th>#</th><th>Cohorte</th><th>Abandon</th><th class="num">Poids</th>'
       + v.colonnes.map((c) => `<th class="num">${echapper(c)}</th>`).join('') + '</tr>';
     $('voisins-lignes').innerHTML = v.plus_proches.map((l) => `<tr>
-      <td>${l.rang}</td>
-      <td>${l.reel ? 'Réel' : '<span class="badge bg-secondary-lt" title="Profil de référence créé pour équilibrer les données">Synthétique</span>'}</td>
+      <td>${l.rang}</td><td>${l.cohorte}</td>
       <td>${l.abandon ? '<span class="text-danger">Oui</span>' : 'Non'}</td>
+      <td class="num">${(100 * l.poids).toFixed(1).replace('.', ',')} %</td>
       ${l.valeurs.map((x) => `<td class="num">${echapper(String(x).replace('.', ','))}</td>`).join('')}</tr>`).join('');
-    $('voisins-bas').textContent = `Parmi ces ${v.plus_proches.length} étudiants, ${v.abandons_parmi_plus_proches} ont abandonné.`;
+    const nb = Number(v.nb_etudiants).toLocaleString('fr-FR');
+    $('voisins-bas').textContent = `Parmi ces ${v.plus_proches.length} étudiants, ${v.abandons_parmi_plus_proches} ont abandonné. `
+      + `Ils pèsent ${(100 * v.poids_plus_proches).toFixed(0)} % de l'estimation à noyau, qui tient compte des ${nb} étudiants `
+      + `des cohortes 2008 à 2014, avec un poids qui diminue avec la distance (environ ${String(v.nombre_effectif).replace('.', ',')} voisins effectifs).`;
   }
 
   function rendre(racine, json, options) {
     const choix = options || {};
     const $ = (role) => racine.querySelector(`[data-role="${role}"]`);
-    $('bandeau-precoce').hidden = !json.mode_precoce;
+    $('bandeau-precoce').textContent = `Estimation ${json.libelle_moment}`
+      + (json.moment === 'T2' ? '.' : json.moment === 'T1' ? ' : les résultats du 2e semestre ne sont pas utilisés.'
+        : ' : aucun résultat universitaire n\'est encore connu, l\'estimation est moins précise.');
+    $('alerte').innerHTML = json.alerte
+      ? '<span class="text-danger">&#9888;</span> <strong>Alerte</strong> : le risque atteint le seuil d\'accompagnement (1 sur 6).'
+      : 'Pas d\'alerte : le risque reste sous le seuil d\'accompagnement (1 sur 6).';
     [['noyau', json.probabilite_noyau, json.categorie_noyau], ['ml', json.probabilite_ml, json.categorie_ml]].forEach(([cle, proba, cat]) => {
       $('p-' + cle).textContent = f3(proba);
       const badge = $('b-' + cle); badge.textContent = NIVEAUX[cat]; badge.className = 'badge badge-risque mt-1 risque-' + cat;
@@ -31,8 +39,8 @@
       const v = $('v-' + cle);
       if (json.verification && json.verification[cle] !== undefined) {
         v.innerHTML = json.verification[cle]
-          ? '<span class="concordance-ok">&#10003;</span> conforme au devenir réel'
-          : '<span class="text-danger">&#10007;</span> différent du devenir réel';
+          ? '<span class="concordance-ok">&#10003;</span> alerte conforme au devenir réel'
+          : '<span class="text-danger">&#10007;</span> alerte différente du devenir réel';
       } else { v.textContent = ''; }
     });
     // Sur la saisie individuelle, le formulaire ne demande jamais les 23 variables

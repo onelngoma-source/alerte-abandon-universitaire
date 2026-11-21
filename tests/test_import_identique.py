@@ -9,13 +9,13 @@ from conftest import RACINE, lignes_sans_id, televerser
 
 def test_import_du_jeu_de_test_identique_au_tableau_de_bord(client, contenu_jeu_de_test):
     id_tableau = client.post("/api/cohortes/jeu-de-test").json["cohorte_id"]
-    r = televerser(client, contenu_jeu_de_test, "jeu_de_test_1328.csv")
-    assert r.status_code == 200 and r.json["nb_ignorees"] == 0 and r.json["effectif"] == 1328
+    r = televerser(client, contenu_jeu_de_test, "jeu_de_test_2015_2017.csv")
+    assert r.status_code == 200 and r.json["nb_ignorees"] == 0 and r.json["effectif"] == 1227
     lignes_t, d_t = lignes_sans_id(client, id_tableau)
     lignes_i, d_i = lignes_sans_id(client, r.json["cohorte_id"])
     assert lignes_t == lignes_i                      # meme tableau, ligne par ligne, valeur par valeur
     assert d_t["metriques"] == d_i["metriques"]      # memes indicateurs
-    assert d_t["memoire"] == d_i["memoire"] is not None  # la concordance avec le memoire s'affiche aussi
+    assert d_t["reference"] == d_i["reference"] is not None  # la concordance avec l'evaluation finale aussi
 
 
 def test_ordre_des_colonnes_separateur_et_virgule_decimale_sans_effet(client, contenu_jeu_de_test):
@@ -50,30 +50,39 @@ def test_correspondance_manuelle_des_colonnes_donne_le_meme_tableau(client, cont
 
 
 def test_fichier_reduit_aux_13_champs_est_calcule_avec_estimation(client, contenu_jeu_de_test):
-    """Avec les seuls 13 champs, les 23 autres variables sont estimees : le tableau existe mais
+    """Avec les seuls 13 champs, 19 des 32 variables du modele T2 sont estimees : le tableau existe mais
     n'est PAS identique (c'est attendu et affiche), et reste de bonne qualite."""
     df = pd.read_csv(io.BytesIO(contenu_jeu_de_test), dtype=str)
     from moteur.referentiels import CHAMPS_FORMULAIRE
     fichier = df[["Reference"] + CHAMPS_FORMULAIRE + ["Target"]].to_csv(index=False).encode("utf-8")
     r = televerser(client, fichier, "reduit.csv")
-    assert r.status_code == 200 and r.json["variables_reconnues"] == 13 and r.json["moyenne_estimees"] == 23.0
+    assert r.status_code == 200 and r.json["variables_reconnues"] == 13 and r.json["moyenne_estimees"] == 19.0
     d = client.get(f"/api/cohortes/{r.json['cohorte_id']}").json
-    assert len(d["lignes"]) == 1328
-    assert d["memoire"] is not None  # meme references : la comparaison au memoire est montree, l'ecart se lit
-    assert d["metriques"]["ml"]["auc"] > 0.88 and d["metriques"]["noyau"]["auc"] > 0.83
+    assert len(d["lignes"]) == 1227
+    assert d["reference"] is not None  # memes references : la comparaison a l'evaluation finale est montree
+    assert d["metriques"]["ml"]["auc"] > 0.88 and d["metriques"]["noyau"]["auc"] > 0.85
     # le test d'identite est discriminant : ici les probabilites different bien du tableau de bord
     reference = client.post("/api/cohortes/jeu-de-test").json["cohorte_id"]
     p_ref = [l["p_ml"] for l in client.get(f"/api/cohortes/{reference}").json["lignes"]]
     assert p_ref != [l["p_ml"] for l in d["lignes"]]
 
 
-def test_fichier_sans_deuxieme_semestre_passe_en_mode_precoce(client, contenu_jeu_de_test):
+def test_fichier_sans_deuxieme_semestre_utilise_le_modele_t1(client, contenu_jeu_de_test):
     df = pd.read_csv(io.BytesIO(contenu_jeu_de_test), dtype=str)
     from moteur.referentiels import CHAMPS_FORMULAIRE
     colonnes = ["Reference"] + [c for c in CHAMPS_FORMULAIRE if "2nd sem" not in c]
-    r = televerser(client, df[colonnes].head(40).to_csv(index=False).encode("utf-8"), "precoce.csv")
-    assert r.status_code == 200 and r.json["nb_precoces"] == 40
-    assert {l["mode"] for l in client.get(f"/api/cohortes/{r.json['cohorte_id']}").json["lignes"]} == {"precoce"}
+    r = televerser(client, df[colonnes].head(40).to_csv(index=False).encode("utf-8"), "premier_semestre.csv")
+    assert r.status_code == 200 and r.json["nb_precoces"] == 40 and r.json["par_moment"] == {"T0": 0, "T1": 40, "T2": 0}
+    assert {l["mode"] for l in client.get(f"/api/cohortes/{r.json['cohorte_id']}").json["lignes"]} == {"T1"}
+
+
+def test_fichier_sans_aucun_semestre_utilise_le_modele_t0(client, contenu_jeu_de_test):
+    df = pd.read_csv(io.BytesIO(contenu_jeu_de_test), dtype=str)
+    from moteur.referentiels import CHAMPS_FORMULAIRE
+    colonnes = ["Reference"] + [c for c in CHAMPS_FORMULAIRE if "sem" not in c]
+    r = televerser(client, df[colonnes].head(40).to_csv(index=False).encode("utf-8"), "inscription.csv")
+    assert r.status_code == 200 and r.json["par_moment"] == {"T0": 40, "T1": 0, "T2": 0}
+    assert {l["mode"] for l in client.get(f"/api/cohortes/{r.json['cohorte_id']}").json["lignes"]} == {"T0"}
 
 
 def test_lignes_invalides_ignorees_et_signalees(client):
@@ -148,14 +157,14 @@ def test_36_variables_sous_d_autres_noms_donnent_le_meme_tableau(client, moteur,
 
 
 def test_sans_les_variables_supplementaires_le_tableau_differe(client, moteur, contenu_jeu_de_test):
-    """Contre-epreuve : si seules les 13 variables principales sont associees, les 23 autres sont estimees."""
+    """Contre-epreuve : si seules les 13 variables principales sont associees, 19 variables du modele sont estimees."""
     from moteur.referentiels import CHAMPS_FORMULAIRE
     reference = client.post("/api/cohortes/jeu-de-test").json["cohorte_id"]
     df, renommage = _fichier_renomme(contenu_jeu_de_test, moteur)
     correspondance = {c: renommage[next(k for k in renommage if moteur.normaliser(k) == moteur.normaliser(c))] for c in CHAMPS_FORMULAIRE}
     correspondance.update({"reference": "Matricule", "devenir": "Statut final"})
     r = televerser(client, df.to_csv(index=False).encode("utf-8"), "13_sur_36.csv", mapping=json.dumps(correspondance))
-    assert r.status_code == 200 and r.json["variables_reconnues"] == 13 and r.json["moyenne_estimees"] == 23.0
+    assert r.status_code == 200 and r.json["variables_reconnues"] == 13 and r.json["moyenne_estimees"] == 19.0
     assert lignes_sans_id(client, reference)[0] != lignes_sans_id(client, r.json["cohorte_id"])[0]
 
 

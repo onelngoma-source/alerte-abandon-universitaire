@@ -34,7 +34,7 @@ def client(app):
 
 @pytest.fixture(scope="session")
 def contenu_jeu_de_test():
-    return (RACINE / "data" / "jeu_de_test_1328.csv").read_bytes()
+    return (RACINE / "data" / "jeu_de_test_2015_2017.csv").read_bytes()
 
 
 def televerser(client, contenu: bytes, nom="fichier.csv", **champs):

@@ -53,8 +53,8 @@ def test_demarrage_vide_puis_chargement_du_jeu_de_test(page):
     assert pg.is_visible("#etat-vide") and pg.is_hidden("#cohorte-vue")
     pg.click("#btn-charger-test-vide")
     pg.wait_for_selector("#cohorte-vue:not([hidden])")
-    assert pg.inner_text("[data-kpi=effectif]").replace(" ", "").replace(" ", "").replace(" ", "") == "1328"
-    assert pg.inner_text("[data-kpi=abandons]").replace(" ", "").replace(" ", "").replace(" ", "") == "427"
+    assert pg.inner_text("[data-kpi=effectif]").replace(" ", "").replace(" ", "").replace(" ", "") == "1227"
+    assert pg.inner_text("[data-kpi=abandons]").replace(" ", "").replace(" ", "").replace(" ", "") == "326"
 
 
 def test_tableau_de_bord_et_import_ont_le_meme_rendu(page):
@@ -66,7 +66,7 @@ def test_tableau_de_bord_et_import_ont_le_meme_rendu(page):
     taille_tableau = {k: v for k, v in pg.locator("#cohorte-vue").bounding_box().items() if k in ("width", "height")}
 
     pg.goto(base + "/import")
-    pg.set_input_files("#fichier", str(RACINE / "data" / "jeu_de_test_1328.csv"))
+    pg.set_input_files("#fichier", str(RACINE / "data" / "jeu_de_test_2015_2017.csv"))
     pg.click("#btn-analyser")
     pg.wait_for_selector("#cohorte-vue:not([hidden])")
     pg.wait_for_timeout(500)
@@ -126,9 +126,9 @@ def test_graphique_par_filiere_suit_les_filtres_et_le_modele(page):
     comptes = lambda: pg.evaluate("Chart.getChart(document.querySelector('[data-role=graphique-filiere]')).data.datasets.map(d => d.counts)")
     assert len(etiquettes()) == 17
     total = sum(sum(c) for c in comptes())
-    assert total == 1328
+    assert total == 1227
     pg.select_option("[data-role=modele-filiere]", "noyau")
-    assert sum(sum(c) for c in comptes()) == 1328
+    assert sum(sum(c) for c in comptes()) == 1227
     pg.select_option("[data-filtre=filiere]", index=1)
     pg.wait_for_timeout(200)
     assert len(etiquettes()) == 1

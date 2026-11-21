@@ -15,7 +15,7 @@ import pytest
 from werkzeug.security import generate_password_hash
 
 RACINE = Path(__file__).resolve().parent.parent
-FICHIER = RACINE / "data" / "jeu_de_test_1328.csv"
+FICHIER = RACINE / "data" / "jeu_de_test_2015_2017.csv"
 
 
 @pytest.fixture(scope="module")

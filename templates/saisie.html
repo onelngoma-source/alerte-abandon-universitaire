@@ -27,6 +27,7 @@
     <button type="button" role="menuitem" data-exemple="intermediaire">Profil intermédiaire</button>
     <button type="button" role="menuitem" data-exemple="solide">Profil solide</button>
     <button type="button" role="menuitem" data-exemple="precoce">Fin de 1er semestre</button>
+    <button type="button" role="menuitem" data-exemple="inscription">À l'inscription</button>
   </div>
 </div>
 <button class="bouton rond" type="button" id="effacer" aria-label="Vider le formulaire">
@@ -67,17 +68,18 @@
     <form class="card colonne-form" id="formulaire" autocomplete="off">
       <div class="defile-form">
         <fieldset class="groupe">
-          <legend>Premier semestre</legend>
+          <legend>Premier semestre <span class="option">facultatif</span></legend>
+          <p class="aide-groupe">Laissez les deux semestres vides pour une estimation dès l'inscription.</p>
           <div class="grille-champs">
-            {{ nombre('Curricular units 1st sem (enrolled)') }}{{ nombre('Curricular units 1st sem (approved)') }}
-            {{ nombre('Curricular units 1st sem (evaluations)') }}{{ nombre('Curricular units 1st sem (grade)', '0.1', unite='/20') }}
+            {{ nombre('Curricular units 1st sem (enrolled)', facultatif=True) }}{{ nombre('Curricular units 1st sem (approved)', facultatif=True) }}
+            {{ nombre('Curricular units 1st sem (evaluations)', facultatif=True) }}{{ nombre('Curricular units 1st sem (grade)', '0.1', True, '/20') }}
           </div>
         </fieldset>
 
         <fieldset class="groupe">
           <legend>Deuxième semestre <span class="option">facultatif</span></legend>
           <p class="aide-groupe">Laissez ces champs vides si l'étudiant n'a fait que le premier semestre :
-             l'estimation se fait alors sur les seules données du premier semestre.</p>
+             l'estimation utilise alors le modèle de fin du premier semestre.</p>
           <div class="grille-champs">
             {{ nombre('Curricular units 2nd sem (enrolled)', facultatif=True) }}{{ nombre('Curricular units 2nd sem (approved)', facultatif=True) }}
             {{ nombre('Curricular units 2nd sem (evaluations)', facultatif=True) }}{{ nombre('Curricular units 2nd sem (grade)', '0.1', True, '/20') }}
@@ -127,7 +129,7 @@
         </svg>
         <p class="titre-attente">Le résultat s'affichera ici</p>
         <p class="texte-attente">Renseignez la situation de l'étudiant, puis lancez l'estimation.
-           Les deux modèles répondent côte à côte, avec les étudiants au profil le plus proche.</p>
+           Le modèle retenu et l'approche à noyau répondent côte à côte, avec les étudiants au profil le plus proche.</p>
       </div>
 
       <div id="resultat" hidden>

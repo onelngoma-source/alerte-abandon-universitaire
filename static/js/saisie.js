@@ -10,10 +10,12 @@
     intermediaire: Object.assign(S1(6, 4, 8, 11.5), S2(6, 4, 8, 11.0), { 'Age at enrollment': 20, 'Scholarship holder': 0, 'Debtor': 0, 'Tuition fees up to date': 1, Course: 9238 }),
     solide: Object.assign(S1(6, 6, 7, 14.5), S2(6, 6, 7, 14.0), { 'Age at enrollment': 18, 'Scholarship holder': 1, 'Debtor': 0, 'Tuition fees up to date': 1, Course: 9500 }),
     precoce: Object.assign(S1(6, 3, 8, 10.5), S2('', '', '', ''), { 'Age at enrollment': 19, 'Scholarship holder': 0, 'Debtor': 0, 'Tuition fees up to date': 1, Course: 9147 }),
+    inscription: Object.assign(S1('', '', '', ''), S2('', '', '', ''), { 'Age at enrollment': 27, 'Scholarship holder': 0, 'Debtor': 1, 'Tuition fees up to date': 0, Course: 9991 }),
   };
 
   const champs = Array.from(document.querySelectorAll('#formulaire [name]'));
   const champsS2 = champs.filter((c) => c.name.includes('2nd sem'));
+  const champsS1 = champs.filter((c) => c.name.includes('1st sem'));
 
   /* --- etat du formulaire : progression et portee de l'estimation --- */
   function majEtat() {
@@ -25,14 +27,11 @@
 
     const etat = $('etat-mode'), mot = $('etat-mode-texte');
     if (!etat || !mot) return;
-    const sansS2 = champsS2.every((c) => String(c.value).trim() === '');
-    // les listes deroulantes ont une valeur par defaut : le formulaire est dit
-    // vide tant qu'aucun champ chiffre n'a ete renseigne
-    const aucunChiffre = champs.filter((c) => c.type === 'number')
-                               .every((c) => String(c.value).trim() === '');
-    if (aucunChiffre) { etat.dataset.mode = 'vide'; mot.textContent = 'Formulaire vide'; }
-    else if (sansS2) { etat.dataset.mode = 'premier'; mot.textContent = 'Premier semestre seul'; }
-    else { etat.dataset.mode = 'complet'; mot.textContent = 'Deux semestres'; }
+    // le modele est choisi selon l'information fournie : inscription, fin du 1er ou du 2e semestre
+    const vide = (liste) => liste.every((c) => String(c.value).trim() === '');
+    if (!vide(champsS2)) { etat.dataset.mode = 'complet'; mot.textContent = 'Modèle de fin du 2e semestre'; }
+    else if (!vide(champsS1)) { etat.dataset.mode = 'premier'; mot.textContent = 'Modèle de fin du 1er semestre'; }
+    else { etat.dataset.mode = 'vide'; mot.textContent = "Modèle de l'inscription"; }
   }
   $('formulaire').addEventListener('input', majEtat);
   $('formulaire').addEventListener('change', majEtat);

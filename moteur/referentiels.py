@@ -4,9 +4,16 @@ Les cles restent en anglais car ce sont les noms de colonnes du jeu de donnees U
 (Realinho et al., 2021) sur lequel les modeles ont ete entraines.
 """
 
-# Seuils de categorisation du risque (Chapitre IV) : faible < 0,30 <= moyen < 0,60 <= eleve
-SEUIL_MOYEN = 0.30
-SEUIL_ELEVE = 0.60
+# Seuil d'alerte fixe par les couts : un abandon non detecte coute 5 accompagnements inutiles,
+# donc on alerte des que la probabilite (calibree) atteint 1 / (1 + 5).
+RAPPORT_COUTS = 5
+SEUIL_ALERTE = 1 / (1 + RAPPORT_COUTS)
+# Trois niveaux : faible (pas d'alerte) < 1/6 <= moyen < 0,5 <= eleve
+SEUIL_MOYEN = SEUIL_ALERTE
+SEUIL_ELEVE = 0.5
+
+# Moments de prediction : on choisit le modele selon l'information disponible
+LIBELLES_MOMENTS = {"T0": "à l'inscription", "T1": "à la fin du 1er semestre", "T2": "à la fin du 2e semestre"}
 
 NIVEAUX = {"faible": "Faible", "moyen": "Moyen", "eleve": "Élevé"}
 
@@ -48,8 +55,6 @@ CHAMPS_FORMULAIRE = [
     "Age at enrollment",
     "Course",
 ]
-# Sous-ensemble independant du 2e semestre (mode precoce)
-CHAMPS_FORMULAIRE_PRECOCE = [c for c in CHAMPS_FORMULAIRE if "2nd sem" not in c]
 CHAMPS_2E_SEMESTRE = [c for c in CHAMPS_FORMULAIRE if "2nd sem" in c]
 CHAMPS_OUI_NON = ["Tuition fees up to date", "Scholarship holder", "Debtor"]
 
@@ -87,6 +92,8 @@ LIBELLES_CHAMPS = {
     "Curricular units 2nd sem (approved)": "Unités validées, 2e semestre",
     "Curricular units 2nd sem (grade)": "Moyenne, 2e semestre (/20)",
     "Curricular units 2nd sem (without evaluations)": "Unités sans évaluation, 2e semestre",
+    "taux_validation_1st": "Taux de validation, 1er semestre",
+    "taux_validation_2nd": "Taux de validation, 2e semestre",
     "Unemployment rate": "Taux de chômage",
     "Inflation rate": "Taux d'inflation",
     "GDP": "PIB",

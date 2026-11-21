@@ -41,7 +41,7 @@
             <path d="M4 18V9"/><path d="M10 18V5"/><path d="M16 18v-6"/><path d="M3 21h18"/></svg>
         </span>
         <h3>La base est vide</h3>
-        <p>Aucun étudiant n'est encore chargé. Chargez le jeu de démonstration de 1 328 étudiants,
+        <p>Aucun étudiant n'est encore chargé. Chargez le jeu de démonstration de 1 227 étudiants (cohortes 2015 à 2017),
            ou importez votre propre fichier depuis « Import CSV ».</p>
         <div class="pied-carte centre" style="display:flex; gap:9px; justify-content:center; padding-top:16px">
           <button class="bouton plein" type="button" id="btn-charger-test-vide">Charger le jeu de test</button>
@@ -76,7 +76,7 @@
   async function charger() {
     document.querySelectorAll('#btn-charger-test, #btn-charger-test-vide').forEach((b) => { if (b) b.disabled = true; });
     const info = document.getElementById('chargement'); if (info) info.hidden = false;
-    if (window.Chargement) window.Chargement.afficher('Calcul du risque des 1 328 étudiants');
+    if (window.Chargement) window.Chargement.afficher('Calcul du risque des 1 227 étudiants');
     const res = await fetch('/api/cohortes/jeu-de-test', { method: 'POST' });
     const json = await res.json();
     location.href = '/tableau?cohorte=' + json.cohorte_id;

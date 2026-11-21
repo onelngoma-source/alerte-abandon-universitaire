@@ -15,7 +15,7 @@
     { cle: 'note_s2', titre: 'Moy. S2', type: 'num' },
     { cle: 'devenir', titre: 'Devenir réel', type: 'texte' },
     { cle: 'p_noyau', titre: 'Noyau', type: 'risque', cat: 'c_noyau' },
-    { cle: 'p_ml', titre: 'Random Forest', type: 'risque', cat: 'c_ml' },
+    { cle: 'p_ml', titre: 'Régression logistique', type: 'risque', cat: 'c_ml' },
   ];
 
   const echapper = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -88,7 +88,10 @@
       }
       if (c.cle === 'devenir') return devenirLibelle(l) || '-';
       if (c.cle === 'reference') {
-        return echapper(l.reference) + (l.mode === 'precoce' ? ' <span class="badge bg-blue-lt ref-precoce" title="Estimation faite sans les résultats du 2e semestre">1er sem.</span>' : '');
+        const MOMENTS = { T0: ['Inscription', 'Estimation faite sans aucun résultat universitaire'],
+                          T1: ['1er sem.', 'Estimation faite sans les résultats du 2e semestre'] };
+        const mo = MOMENTS[l.mode];
+        return echapper(l.reference) + (mo ? ` <span class="badge bg-blue-lt ref-precoce" title="${mo[1]}">${mo[0]}</span>` : '');
       }
       return l[c.cle] === null ? '-' : echapper(l[c.cle]);
     }
@@ -159,7 +162,7 @@
     /* --- modèle de référence : il décide du tri du tableau, du filtre de
        niveau et du graphique par filière. Le second modèle reste visible dans
        sa colonne et garde son propre filtre dans le tiroir. --- */
-    const NOM_MODELE = { ml: 'Random Forest', noyau: 'approche à noyau' };
+    const NOM_MODELE = { ml: 'régression logistique', noyau: 'approche à noyau' };
     const modeleChoisi = () => ($('[data-role="modele-filiere"]').value === 'noyau' ? 'noyau' : 'ml');
     const catModele = () => (modeleChoisi() === 'noyau' ? 'c_noyau' : 'c_ml');
     const proModele = () => (modeleChoisi() === 'noyau' ? 'p_noyau' : 'p_ml');
@@ -168,7 +171,7 @@
       const m = modeleChoisi();
       $('[data-role="niveaux"]').setAttribute('aria-label', 'Niveau de risque, ' + NOM_MODELE[m]);
       $('[data-role="legende-filiere"]').textContent =
-        (m === 'ml' ? 'Random Forest' : 'Approche à noyau') + ' · sélection courante';
+        (m === 'ml' ? 'Régression logistique' : 'Approche à noyau') + ' · sélection courante';
       $('[data-role="ancre-ml"]').hidden = m !== 'ml';
       $('[data-role="ancre-noyau"]').hidden = m !== 'noyau';
       $('[data-role="ind-ml"]').dataset.reference = m === 'ml' ? 'oui' : 'non';
@@ -189,7 +192,7 @@
     /* --- puces des filtres actifs --- */
     const LIBELLES = { q: 'Référence', filiere: 'Filière', genre: 'Genre', abandon_reel: 'Devenir',
       age_min: 'Âge ≥', age_max: 'Âge ≤', boursier: 'Boursier', debiteur: 'Débiteur',
-      frais_a_jour: 'Frais à jour', c_noyau: 'Risque · noyau', c_ml: 'Risque · Random Forest' };
+      frais_a_jour: 'Frais à jour', c_noyau: 'Risque · noyau', c_ml: 'Risque · régression logistique' };
     function lisible(cle, v) {
       if (['boursier', 'debiteur', 'frais_a_jour'].includes(cle)) return v === '1' ? 'oui' : 'non';
       if (cle === 'abandon_reel') return v === '1' ? 'abandon' : 'pas d\'abandon';
@@ -236,7 +239,7 @@
         labels: niveaux.map((n) => NIVEAUX[n]),
         datasets: [
           { label: 'Noyau', data: compter('c_noyau'), backgroundColor: '#3281E0' },
-          { label: 'Random Forest', data: compter('c_ml'), backgroundColor: '#0D3863' },
+          { label: 'Régression logistique', data: compter('c_ml'), backgroundColor: '#0D3863' },
         ],
       }, { y: { beginAtZero: true, ticks: { precision: 0 } } });
       if (etat.avecDevenir) {
@@ -248,7 +251,7 @@
           labels: niveaux.map((n) => NIVEAUX[n]),
           datasets: [
             { label: 'Noyau', data: taux('c_noyau'), backgroundColor: '#3281E0' },
-            { label: 'Random Forest', data: taux('c_ml'), backgroundColor: '#0D3863' },
+            { label: 'Régression logistique', data: taux('c_ml'), backgroundColor: '#0D3863' },
           ],
         }, { y: { beginAtZero: true, max: 100, title: { display: true, text: '% d\'abandons réels' } } });
       }
@@ -308,12 +311,16 @@
       const bloc = $('[data-role="performances"]');
       bloc.hidden = !m.noyau;
       if (!m.noyau) return;
-      $('[data-role="performances-sous"]').textContent = '';
+      const ref = donnees.reference;
+      $('[data-role="performances-sous"]').textContent = ref
+        ? `identiques à l'évaluation finale pré-enregistrée (ROC-AUC ${f3(ref.ml.auc)} et ${f3(ref.noyau.auc)})`
+        : `${nombre(m.effectif)} étudiants dont le devenir est connu`;
       const ligne = (nom, cle) => {
         const v = m[cle];
-        return `<tr><td>${nom}</td><td class="num">${f3(v.auc)}</td><td class="num">${f3(v.exactitude)}</td><td class="num">${f3(v.f1)}</td></tr>`;
+        return `<tr><td>${nom}</td><td class="num">${f3(v.auc)}</td><td class="num">${f3(v.brier)}</td>`
+          + `<td class="num">${pct(v.rappel, 1)}</td><td class="num">${pct(v.precision, 1)}</td></tr>`;
       };
-      $('[data-role="performances-corps"]').innerHTML = ligne('Approche à noyau', 'noyau') + ligne('Random Forest', 'ml');
+      $('[data-role="performances-corps"]').innerHTML = ligne('Régression logistique (retenue)', 'ml') + ligne('Approche à noyau', 'noyau');
     }
 
     function exporter() {

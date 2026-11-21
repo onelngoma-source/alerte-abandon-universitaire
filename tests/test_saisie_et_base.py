@@ -29,10 +29,13 @@ def test_nombres_json_ou_textes_donnent_le_meme_resultat(client):
     assert client.post("/api/predict", json=PROFIL).json == client.post("/api/predict", json=en_nombres).json
 
 
-def test_mode_precoce_si_aucune_donnee_de_deuxieme_semestre(client):
-    p = {k: v for k, v in PROFIL.items() if "2nd sem" not in k}
-    sortie = client.post("/api/predict", json=p).json
-    assert sortie["mode_precoce"] is True and len(sortie["facteurs_contributifs"]) == 5
+def test_le_moment_depend_des_semestres_fournis(client):
+    sans_s2 = {k: v for k, v in PROFIL.items() if "2nd sem" not in k}
+    sans_semestre = {k: v for k, v in PROFIL.items() if "sem" not in k}
+    moments = [client.post("/api/predict", json=p).json for p in (PROFIL, sans_s2, sans_semestre)]
+    assert [s["moment"] for s in moments] == ["T2", "T1", "T0"]
+    assert [s["nb_variables_modele"] for s in moments] == [32, 26, 20]
+    assert all(len(s["facteurs_contributifs"]) == 5 for s in moments)
 
 
 def test_incoherence_validees_superieures_aux_inscrites_refusee(client):
@@ -55,7 +58,7 @@ def test_conseils_financiers_avec_des_zeros_numeriques(client):
 
 def test_les_variables_estimees_sont_signalees(client):
     sortie = client.post("/api/predict", json=PROFIL).json
-    assert sortie["nb_variables_estimees"] == 23 and sortie["nb_variables_modele"] == 36
+    assert sortie["nb_variables_estimees"] == 19 and sortie["nb_variables_modele"] == 32
 
 
 def test_acces_protege(app):
@@ -75,7 +78,7 @@ def test_la_base_demarre_vide_puis_le_jeu_de_test_se_charge_une_seule_fois(clien
 def test_suppression_en_cascade_et_remise_a_zero(client, contenu_jeu_de_test):
     cohorte = client.post("/api/cohortes/jeu-de-test").json["cohorte_id"]
     with db.connecter() as c:
-        assert c.execute("SELECT COUNT(*) FROM score").fetchone()[0] == 2 * 1328
+        assert c.execute("SELECT COUNT(*) FROM score").fetchone()[0] == 2 * 1227
     client.delete(f"/api/cohortes/{cohorte}")
     with db.connecter() as c:
         assert [c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in ("cohorte", "etudiant", "score")] == [0, 0, 0]
@@ -96,18 +99,18 @@ def test_le_schema_impose_les_contraintes(client):
 
 
 def test_par_defaut_les_donnees_sont_deja_affichees_au_demarrage(app_prechargee):
-    """Consigne de l'encadreur : au lancement, le tableau de bord contient deja les 1 328 etudiants de test."""
+    """Consigne de l'encadreur : au lancement, le tableau de bord contient deja les 1 227 etudiants de test (cohortes 2015 a 2017)."""
     c = app_prechargee.test_client()
     c.post("/connexion", data={"identifiant": "admin", "mot_de_passe": "changez-moi"})
     cohortes = c.get("/api/cohortes").json
-    assert len(cohortes) == 1 and cohortes[0]["origine"] == "test_uci" and cohortes[0]["effectif"] == 1328
-    assert len(c.get(f"/api/cohortes/{cohortes[0]['id']}").json["lignes"]) == 1328
+    assert len(cohortes) == 1 and cohortes[0]["origine"] == "test_uci" and cohortes[0]["effectif"] == 1227
+    assert len(c.get(f"/api/cohortes/{cohortes[0]['id']}").json["lignes"]) == 1227
 
 
 def test_fiche_d_un_etudiant_reproduit_les_scores_du_tableau(client, contenu_jeu_de_test):
     cohorte = client.post("/api/cohortes/jeu-de-test").json["cohorte_id"]
     lignes = client.get(f"/api/cohortes/{cohorte}").json["lignes"]
-    for l in lignes[::60]:  # un echantillon de 23 etudiants
+    for l in lignes[::60]:  # un echantillon de 21 etudiants
         f = client.get(f"/api/etudiants/{l['id']}").json
         assert f["reference"] == l["reference"]
         assert f["resultat"]["probabilite_noyau"] == round(l["p_noyau"], 3)
@@ -116,12 +119,12 @@ def test_fiche_d_un_etudiant_reproduit_les_scores_du_tableau(client, contenu_jeu
         assert f["verification"] is not None and set(f["verification"]) == {"noyau", "ml"}
 
 
-def test_fiche_signale_les_variables_estimees_et_le_mode_precoce(client):
+def test_fiche_signale_les_variables_estimees_et_le_moment(client):
     fichier = pd.DataFrame([{k: v for k, v in PROFIL.items() if "2nd sem" not in k}]).to_csv(index=False).encode()
     r = televerser(client, fichier)
     ligne = client.get(f"/api/cohortes/{r.json['cohorte_id']}").json["lignes"][0]
     f = client.get(f"/api/etudiants/{ligne['id']}").json
-    assert f["resultat"]["mode_precoce"] is True and f["verification"] is None and f["devenir"] is None
+    assert f["resultat"]["moment"] == "T1" and f["verification"] is None and f["devenir"] is None
     assert any(not p["fournie"] for p in f["profil"]) and f["resultat"]["nb_variables_estimees"] > 0
     assert f["resultat"]["probabilite_ml"] == round(ligne["p_ml"], 3)
 
@@ -132,38 +135,26 @@ def test_fiche_inconnue_et_acces_protege(client, app):
 
 
 # ---------------------------------------------------------------- explication du noyau par ses voisins
-def _ecarts_noyau(moteur, contenu_jeu_de_test, precoce: bool):
+@pytest.mark.parametrize("moment", ["T0", "T1", "T2"])
+def test_les_voisins_retrouvent_exactement_la_probabilite_du_noyau(moteur, contenu_jeu_de_test, moment):
+    """Le calcul a la main (poids des etudiants ayant abandonne / poids total, sur les 3 197 etudiants
+    du developpement) redonne la probabilite du modele, pour un echantillon d'etudiants de test."""
     import io
-    import numpy as np
-    import pandas as pd
-    from moteur.referentiels import CHAMPS_2E_SEMESTRE
-    df = pd.read_csv(io.BytesIO(contenu_jeu_de_test), sep=None, engine="python", dtype=str)
-    if precoce:
-        for c in CHAMPS_2E_SEMESTRE:
-            df[next(x for x in df.columns if moteur.normaliser(x) == moteur.normaliser(c))] = ""
-    prep = moteur.preparer(df)
-    (mode, profils), = prep["profils"].items()
-    p_noyau, _, X = moteur._predire(profils, mode)
-    ecarts, parts, repli = [], [], 0
-    for i in range(len(X)):
-        v = moteur.voisins_noyau(X[i:i + 1], mode)
-        assert v["nb_reels"] + v["nb_synthetiques"] == v["nb_voisins"] == 75
-        assert len(v["plus_proches"]) == 5
-        ecarts.append(abs(v["probabilite_recalculee"] - p_noyau[i]))
-        parts.append(v["nb_synthetiques"] / 75)
-        repli += v["repli"] is not None
-    return mode, len(X), max(ecarts), float(np.mean(parts)), repli
-
-
-@pytest.mark.parametrize("precoce", [False, True])
-def test_les_voisins_retrouvent_exactement_la_probabilite_du_noyau(moteur, contenu_jeu_de_test, precoce):
-    """Le calcul a la main (poids des voisins ayant abandonne / poids total) redonne la probabilite du modele,
-    pour les 1 328 etudiants de test, en mode complet comme en mode precoce."""
-    mode, n, ecart_max, part_synthetique, repli = _ecarts_noyau(moteur, contenu_jeu_de_test, precoce)
-    assert mode == ("precoce" if precoce else "complet") and n == 1328
-    assert ecart_max < 1e-6          # simple arrondi a 6 decimales
-    assert repli == 0
-    assert 0.25 < part_synthetique < 0.27   # environ un quart des voisins sont des profils SMOTE
+    from moteur.variables import semestre
+    df = pd.read_csv(io.BytesIO(contenu_jeu_de_test), dtype=str, keep_default_na=False)
+    valeurs, _ = moteur.nettoyer(df)
+    if moment != "T2":
+        valeurs[semestre("2nd")] = float("nan")
+    if moment == "T0":
+        valeurs[semestre("1st")] = float("nan")
+    scores = moteur.scorer_valeurs(valeurs)
+    assert set(scores["mode_calcul"]) == {moment}
+    for i in valeurs.index[::25]:
+        r = moteur.expliquer({c: valeurs.at[i, c] for c in valeurs.columns if not pd.isna(valeurs.at[i, c])})
+        v = r["voisins_noyau"]
+        assert r["moment"] == moment and v["nb_etudiants"] == 3197 and len(v["plus_proches"]) == 5
+        assert abs(v["probabilite_recalculee"] - scores.at[i, "probabilite_noyau"]) < 1e-6
+        assert 0 < v["poids_plus_proches"] <= 1 and 1 <= v["nombre_effectif"] <= 3197
 
 
 def test_la_saisie_et_la_fiche_exposent_les_voisins(client):
@@ -171,9 +162,10 @@ def test_la_saisie_et_la_fiche_exposent_les_voisins(client):
               "Curricular units 1st sem (grade)": 13, "Tuition fees up to date": 1, "Age at enrollment": 19, "Course": 9119}
     r = client.post("/api/predict", json=profil).get_json()
     v = r["voisins_noyau"]
-    assert r["mode_precoce"] is True and v["nb_voisins"] == 75
+    assert r["moment"] == "T1" and v["nb_etudiants"] == 3197
     assert abs(v["probabilite_recalculee"] - r["probabilite_noyau"]) < 1e-3
-    assert len(v["colonnes"]) == 4 and all(len(l["valeurs"]) == 4 for l in v["plus_proches"])  # sans le 2e semestre
+    # seules les informations connues a la fin du 1er semestre sont montrees
+    assert len(v["colonnes"]) == 4 and all(len(l["valeurs"]) == 4 for l in v["plus_proches"])
     client.post("/api/cohortes/jeu-de-test")
     fiche = client.get("/api/etudiants/1").get_json()
-    assert fiche["resultat"]["voisins_noyau"]["nb_voisins"] == 75
+    assert fiche["resultat"]["voisins_noyau"]["nb_etudiants"] == 3197

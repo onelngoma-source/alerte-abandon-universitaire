@@ -136,6 +136,7 @@ def importer(moteur: Moteur, df: pd.DataFrame, nom: str, origine: str, fichier: 
         "nb_ignorees": len(erreurs),
         "variables_reconnues": len(reconnues),
         "variables_modele": len(moteur.variables),
-        "nb_precoces": int((scores["mode_calcul"] == "precoce").sum()),
+        "nb_precoces": int((scores["mode_calcul"] != "T2").sum()),
+        "par_moment": {m: int((scores["mode_calcul"] == m).sum()) for m in ("T0", "T1", "T2")},
         "moyenne_estimees": round(float(scores["nb_estimees"].mean()), 1),
     }

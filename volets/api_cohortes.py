@@ -9,15 +9,15 @@ from flask import Blueprint, current_app, jsonify
 import db
 from auth import MODE_DEMO, connexion_requise, proprietaire_courant
 from moteur.conseils import generer_conseils
-from moteur.referentiels import CHAMPS_FORMULAIRE, CHAMPS_OUI_NON, DEVENIRS, FILIERES, LIBELLES_CHAMPS
+from moteur.referentiels import CHAMPS_FORMULAIRE, CHAMPS_OUI_NON, DEVENIRS, FILIERES, LIBELLES_CHAMPS, SEUIL_ALERTE
 
 bp = Blueprint("api_cohortes", __name__, url_prefix="/api/cohortes")
 
 
 @lru_cache(maxsize=1)
 def references_jeu_de_test() -> frozenset:
-    """Les 1 328 references du jeu de test : un fichier importe qui les contient toutes est le jeu de test."""
-    with open(db.RACINE / "data" / "jeu_de_test_1328.csv", encoding="utf-8", newline="") as f:
+    """Les 1 227 references du jeu de test : un fichier importe qui les contient toutes est le jeu de test."""
+    with open(db.RACINE / "data" / db.FICHIER_JEU_DE_TEST, encoding="utf-8", newline="") as f:
         return frozenset(ligne["Reference"] for ligne in csv.DictReader(f))
 
 
@@ -53,7 +53,7 @@ def lire(cohorte_id):
         "cohorte": cohorte,
         "lignes": lignes,
         "metriques": metriques,
-        "memoire": current_app.moteur.valeurs_memoire() if est_le_jeu_de_test(cohorte, lignes) else None,
+        "reference": current_app.moteur.valeurs_reference() if est_le_jeu_de_test(cohorte, lignes) else None,
     })
 
 
@@ -90,7 +90,7 @@ bp_etudiants = Blueprint("api_etudiants", __name__, url_prefix="/api/etudiants")
 @bp_etudiants.get("/<int:etudiant_id>")
 @connexion_requise
 def fiche(etudiant_id):
-    """Fiche d'un etudiant de la base : scores, facteurs (SHAP), conseils, comparaison avec le devenir reel."""
+    """Fiche d'un etudiant de la base : scores, facteurs, voisins, conseils, comparaison avec le devenir reel."""
     e = db.lire_etudiant(etudiant_id)
     if e is None:
         return jsonify({"erreur": "Étudiant introuvable."}), 404
@@ -113,8 +113,9 @@ def fiche(etudiant_id):
     reel = e["abandon_reel"]
     verification = None
     if reel is not None:
-        verification = {cle: ((p >= 0.5) == (reel == 1)) for cle, p in (("noyau", resultat["probabilite_noyau"]),
-                                                                       ("ml", resultat["probabilite_ml"]))}
+        # l'estimation est conforme si l'alerte (probabilite >= 1/6) correspond au devenir reel
+        verification = {cle: ((p >= round(SEUIL_ALERTE, 3)) == (reel == 1))
+                        for cle, p in (("noyau", resultat["probabilite_noyau"]), ("ml", resultat["probabilite_ml"]))}
     cohorte = db.lire_cohorte(e["cohorte_id"], proprietaire_courant())
     if cohorte is None:
         return jsonify({"erreur": "Étudiant introuvable."}), 404

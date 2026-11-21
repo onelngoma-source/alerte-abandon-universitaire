@@ -170,16 +170,16 @@ void main(){
   /* ============ 3. Les bulles de donnees ============ */
   const PANNEAUX = [
     { titre:"Repérer le décrochage avant qu'il arrive",
-      texte:"Chaque étudiant reçoit une estimation de son risque d'abandon, dès la fin du premier semestre.",
+      texte:"Chaque étudiant reçoit une estimation de son risque d'abandon, dès l'inscription puis à chaque semestre.",
       bulles:[
         { c:'b1', z:46, h:`<div class="ligne"><span>Risque estimé</span><span class="etiq chaud">Élevé</span></div>
-             <div class="nombre">0,867</div><div class="jauge"><i style="width:87%"></i></div>
-             <div class="note">Approche à noyau · étudiant E-1718</div>` },
+             <div class="nombre">0,990</div><div class="jauge"><i style="width:99%"></i></div>
+             <div class="note">Régression logistique · étudiant E-3196</div>` },
         { c:'b2', z:24, h:`<div class="ligne" style="gap:6px"><span class="etiq chaud">Élevé</span>
              <span class="etiq">Moyen</span><span class="etiq">Faible</span></div>
-             <div class="note">Trois niveaux, aux seuils de 0,30 et 0,60</div>` },
-        { c:'b3', z:62, h:`<span class="puce"></span><div><div class="nombre petit">1 328</div>
-             <div class="note">étudiants suivis, dont 427 abandons observés</div></div>` } ] },
+             <div class="note">Alerte dès 1 risque sur 6 : un abandon manqué coûte 5 accompagnements</div>` },
+        { c:'b3', z:62, h:`<span class="puce"></span><div><div class="nombre petit">1 227</div>
+             <div class="note">étudiants des cohortes 2015 à 2017, dont 326 abandons observés</div></div>` } ] },
     { titre:"Comprendre, pas seulement prédire",
       texte:"Le score se lit à travers les étudiants qui ressemblent le plus à celui que vous suivez.",
       bulles:[
@@ -190,30 +190,30 @@ void main(){
         { c:'b2', z:28, h:`<div class="ligne" style="margin-bottom:6px"><strong style="font-size:.84rem">Ce qui pèse le plus</strong></div>
              <div class="note" style="color:#FF9A9A">▲ Frais de scolarité en retard</div>
              <div class="note" style="color:#8FE6A6">▼ Unités validées au second semestre</div>` },
-        { c:'b3', z:66, h:`<span class="puce or"></span><div><span class="etiq or">Synthétique</span>
-             <div class="note">Les profils créés pour équilibrer les données sont signalés</div></div>` } ] },
+        { c:'b3', z:66, h:`<span class="puce or"></span><div><span class="etiq or">Réels</span>
+             <div class="note">Tous les voisins sont de vrais étudiants, pesés selon leur ressemblance</div></div>` } ] },
     { titre:"Deux approches, côte à côte",
-      texte:"Une méthode statistique traçable et un modèle d'apprentissage, comparés sur les mêmes étudiants.",
+      texte:"Une méthode à noyau traçable et le modèle retenu, comparés sur les mêmes étudiants.",
       bulles:[
         { c:'b1', z:50, h:`<div class="duo"><div><div class="mini">Approche à noyau</div>
-             <div class="nombre petit">0,875</div><div class="jauge froide"><i style="width:87.5%"></i></div></div>
-             <div><div class="mini">Random Forest</div><div class="nombre petit">0,934</div>
-             <div class="jauge"><i style="width:93.4%;background:linear-gradient(90deg,#F6E7B4,#D8B85C)"></i></div></div></div>
-             <div class="note">AUC mesurée sur 1 328 étudiants jamais vus à l'entraînement</div>` },
-        { c:'b2', z:30, h:`<div class="nombre petit">349</div>
-             <div class="note">étudiants pour lesquels les deux modèles ne disent pas la même chose</div>` },
+             <div class="nombre petit">0,865</div><div class="jauge froide"><i style="width:86.5%"></i></div></div>
+             <div><div class="mini">Régression logistique</div><div class="nombre petit">0,902</div>
+             <div class="jauge"><i style="width:90.2%;background:linear-gradient(90deg,#F6E7B4,#D8B85C)"></i></div></div></div>
+             <div class="note">ROC-AUC sur les cohortes 2015 à 2017, jamais vues à l'entraînement</div>` },
+        { c:'b2', z:30, h:`<div class="nombre petit">219</div>
+             <div class="note">étudiants pour lesquels les deux modèles ne donnent pas le même niveau</div>` },
         { c:'b3', z:64, h:`<span class="puce or"></span><div>Le noyau s'explique par ses voisins
              <div class="note">sans outil d'explication ajouté</div></div>` } ] },
     { titre:"Agir avant le second semestre",
       texte:"Les résultats du premier semestre suffisent à repérer l'essentiel du risque.",
       bulles:[
         { c:'b1', z:48, h:`<div class="ligne"><span>Fin du 1<sup>er</sup> semestre</span>
-             <span class="etiq or">Mode précoce</span></div><div class="nombre">0,912</div>
-             <div class="note">AUC sans aucune donnée du second semestre, contre 0,934 avec l'année complète</div>` },
+             <span class="etiq or">Modèle T1</span></div><div class="nombre">0,876</div>
+             <div class="note">ROC-AUC sans aucune donnée du second semestre, contre 0,902 avec l'année complète</div>` },
         { c:'b2', z:26, h:`<div class="note" style="color:#F6E7B4">✓ Unités inscrites &nbsp; ✓ Unités validées</div>
              <div class="note" style="opacity:.55">◻ Second semestre</div>` },
         { c:'b3', z:68, h:`<span class="puce"></span><div>Bascule automatique
-             <div class="note">30 variables sur 36 suffisent</div></div>` } ] },
+             <div class="note">un modèle par moment : inscription, 1er et 2e semestre</div></div>` } ] },
   ];
 
   const pile = document.getElementById('pile');
@@ -292,8 +292,8 @@ void main(){
   montrer(0); relancer();
 
   /* ============ 4. Chiffres qui derivent ============ */
-  const CHIFFRES = ['0,934','0,875','1 328','427','4 424','75 voisins','0,816','32,2 %','89,6 %',
-                    '3 096','0,867','0,30','0,60','70 / 30','0,747','345','382','0,912','36 variables'];
+  const CHIFFRES = ['0,902','0,865','1 227','326','4 424','3 197','0,876','0,775','1 / 6',
+                    '2008 à 2014','2015 à 2017','7 cohortes','63 %','84 %','0,990','219','T0 · T1 · T2','36 variables'];
   const champ = document.getElementById('particules');
   function semer(){
     if (sobre || econome || !champ || document.hidden) return;

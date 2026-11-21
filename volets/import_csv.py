@@ -132,6 +132,6 @@ def gabarit():
 @connexion_requise
 def exemple():
     """Telecharge le fichier du jeu de test : l'importer doit redonner le tableau de bord."""
-    chemin = db.RACINE / "data" / "jeu_de_test_1328.csv"
+    chemin = db.RACINE / "data" / db.FICHIER_JEU_DE_TEST
     return Response(chemin.read_bytes(), mimetype="text/csv",
-                    headers={"Content-Disposition": "attachment; filename=jeu_de_test_1328.csv"})
+                    headers={"Content-Disposition": f"attachment; filename={db.FICHIER_JEU_DE_TEST}"})

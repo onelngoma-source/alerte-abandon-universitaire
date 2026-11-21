@@ -10,8 +10,8 @@ Hugging Face a rendu les Spaces **Docker** et **Gradio** payants. Seuls les Spac
 gratuits, et un Static ne sert que des fichiers : il ne peut pas faire tourner une application Flask.
 
 Render reste gratuit, sans carte bancaire, avec **512 Mo de mémoire**. La pointe mesurée de cette
-application, en la poussant avec SHAP, le tableau de bord complet et dix allers-retours, est de
-**358 Mo**. Il reste donc 154 Mo de marge, ce qui suffit largement à trois jurés simultanés.
+application, avec le tableau de bord complet et dix fiches ouvertes, est de **251 Mo** (358 Mo pour la
+version du mémoire, avec SHAP et la forêt aléatoire). La marge suffit largement à plusieurs visiteurs simultanés.
 
 Deux contreparties à connaître.
 
@@ -109,7 +109,7 @@ Puis **Create Web Service**. La première construction prend cinq à dix minutes
 L'adresse obtenue a la forme `https://alerte-abandon-universitaire.onrender.com`.
 
 Ouvre-la, identifie-toi avec `jury` et ton mot de passe, et vérifie que le tableau de bord affiche les
-1 328 étudiants.
+1 227 étudiants (cohortes 2015 à 2017).
 
 Si la construction échoue, lis les logs de bas en haut : la vraie erreur est presque toujours la
 dernière ligne rouge.
@@ -144,7 +144,7 @@ même temps sans se gêner. Il change trois choses.
 qui importe un fichier est le seul à voir la cohorte qui en résulte, et le seul à pouvoir ouvrir les
 fiches de ses étudiants.
 
-**La cohorte de référence reste partagée.** Les 1 328 étudiants du jeu de test sont visibles de tous, en
+**La cohorte de référence reste partagée.** Les 1 227 étudiants du jeu de test sont visibles de tous, en
 lecture seule, et personne ne peut les supprimer.
 
 **Les actions destructrices sont bloquées.** Les boutons « Supprimer cette cohorte » et « Vider la base »

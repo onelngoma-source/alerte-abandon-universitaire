@@ -18,15 +18,16 @@ from moteur import cohortes
 from moteur.scoring import Moteur
 from volets import api_cohortes, import_csv, saisie, tableau
 
-NOM_JEU_DE_TEST = "Jeu de test UCI (1 328 étudiants)"
+NOM_JEU_DE_TEST = "Cohortes 2015 à 2017 (test)"
 
 
 def charger_jeu_de_test(app) -> int:
-    """Charge les 1 328 etudiants de test dans la base (une seule fois) par la chaine d'import commune."""
+    """Charge les 1 227 etudiants de test (cohortes 2015 a 2017, jamais vus a l'entrainement)
+    dans la base, une seule fois, par la chaine d'import commune."""
     for c in db.lister_cohortes():
         if c["origine"] == "test_uci":
             return c["id"]
-    chemin = db.RACINE / "data" / "jeu_de_test_1328.csv"
+    chemin = db.RACINE / "data" / db.FICHIER_JEU_DE_TEST
     df, erreur = cohortes.lire_csv(chemin.read_bytes())
     if erreur:
         raise RuntimeError(erreur)
@@ -61,7 +62,7 @@ def creer_application(moteur: Moteur | None = None) -> Flask:
     def racine():
         return redirect(url_for("tableau.page"))
 
-    if os.environ.get("DEMO_PRELOAD", "1") == "1":  # par defaut, les 1 328 etudiants de test sont deja affiches
+    if os.environ.get("DEMO_PRELOAD", "1") == "1":  # par defaut, les 1 227 etudiants de test sont deja affiches
         charger_jeu_de_test(app)
     return app
 
