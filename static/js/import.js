@@ -58,6 +58,7 @@
   async function calculer(fichier, correspondance) {
     const f = new FormData();
     f.append('fichier', fichier); f.append('nom', $('nom').value);
+    if ($('promotion').value) f.append('promotion', $('promotion').value);
     if (correspondance) f.append('mapping', JSON.stringify(correspondance));
     Chargement.afficher('Calcul du risque de chaque étudiant');
     const res = await fetch('/api/import', { method: 'POST', body: f });
@@ -68,9 +69,12 @@
       if (json.colonnes_attendues) m += '\n\nColonnes attendues : ' + json.colonnes_attendues.join(', ');
       etape(1); throw new Error(m);
     }
-    $('resume').textContent = `${nombre(json.effectif)} étudiants importés`;
+    $('resume').textContent = json.mis_a_jour
+      ? `${nombre(json.mis_a_jour)} étudiants mis à jour` + (json.nouveaux ? `, ${nombre(json.nouveaux)} ajoutés` : '')
+      : `${nombre(json.nouveaux)} étudiants importés`;
     const moments = Object.entries(json.par_moment).filter(([, k]) => k > 0).map(([m, k]) => `${nombre(k)} ${MOMENTS[m].toLowerCase()}`);
-    $('resume-detail').textContent = 'Risque estimé : ' + moments.join(', ') + '.'
+    $('resume-detail').textContent = 'Risque estimé : ' + moments.join(', ') + '. '
+      + `${nombre(json.dossiers_ouverts)} dossier(s) de suivi ouvert(s)` + (json.relances ? `, ${nombre(json.relances)} dossier(s) signalé(s) en hausse` : '') + '.'
       + (json.moyenne_estimees > 0 ? ` En moyenne ${String(json.moyenne_estimees).replace('.', ',')} informations complétées par étudiant.` : '');
     $('lien-tableau').href = '/tableau?cohorte=' + json.cohorte_id;
     const av = $('avertissements');
@@ -91,5 +95,7 @@
     $('btn-confirmer').disabled = true;
     try { await calculer($('fichier').files[0], c); } catch (e) { erreur(e.message); } finally { $('btn-confirmer').disabled = false; }
   });
+  const majNom = () => { $('bloc-nom').hidden = Boolean($('promotion').value); };
+  $('promotion').addEventListener('change', majNom); majNom();
   etape(1);
 })();

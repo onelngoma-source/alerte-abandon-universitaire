@@ -76,7 +76,7 @@ def test_filtres_par_niveau_et_par_filiere(page):
     assert all("Faible" in b for b in pg.locator("#lignes .risque-cellule .badge").all_inner_texts())
     pg.click("#niveaux [data-niveau=tous]")
     pg.click("#par-filiere [data-filiere='Agronomie']")
-    assert set(pg.locator("#lignes .etudiant span").all_inner_texts()) == {"Agronomie"}
+    assert {t.split(' · ')[0] for t in pg.locator("#lignes .etudiant span").all_inner_texts()} == {"Agronomie"}
 
 
 def test_un_clic_ouvre_la_fiche_et_permet_de_passer_au_suivant(page):
@@ -123,3 +123,41 @@ def test_les_pages_restent_sobres_sans_jargon(page):
     texte = pg.inner_text("main")
     for mot in ("logit", "Curricular", "Tuition", "T0", "T1", "T2", "p_ml", "undefined", "NaN"):
         assert mot not in texte, mot
+
+
+def test_traiter_une_alerte_depuis_les_dossiers(page):
+    pg, serveur, _ = page
+    charger(pg, serveur)
+    pg.goto(serveur + "/dossiers?vue=non_attribues")
+    pg.wait_for_selector("#lignes tr")
+    pg.click("#lignes tr:first-child td:nth-child(2)")
+    pg.wait_for_selector("#carte-dossier .statut.s-a_contacter")
+    pg.click("[data-op=statut][data-statut=contacte]")
+    pg.wait_for_selector("#carte-dossier .statut.s-contacte")
+    pg.select_option("form[data-op=action] select[name=type]", "entretien")
+    pg.fill("form[data-op=action] textarea", "Entretien fixé jeudi avec l'étudiant.")
+    pg.click("form[data-op=action] button[type=submit]")
+    pg.wait_for_selector("text=Entretien fixé jeudi")
+    pg.click("[data-op=ouvrir-cloture]")
+    pg.select_option("form[data-op=cloture] select[name=motif]", "risque_ecarte")
+    pg.click("form[data-op=cloture] button[type=submit]")
+    pg.wait_for_selector("text=Aucun dossier ouvert")
+    assert "Risque écarté" in pg.inner_text("#carte-dossier")
+
+
+def test_pages_de_pilotage_et_d_administration(page):
+    pg, serveur, _ = page
+    charger(pg, serveur)
+    pg.goto(serveur + "/pilotage")
+    pg.wait_for_selector("#charge tbody tr")
+    assert "455" in pg.inner_text("#kpis")
+    pg.goto(serveur + "/admin/utilisateurs")
+    pg.click("#nouveau")
+    pg.fill("#form-compte [name=nom]", "Conseiller Test")
+    pg.fill("#form-compte [name=identifiant]", "c.test")
+    pg.click("#form-compte button[type=submit]")
+    pg.wait_for_selector("#modale-mdp[open]")
+    assert len(pg.inner_text("#mdp")) == 12
+    pg.goto(serveur + "/admin/journal")
+    pg.wait_for_selector("#lignes tr")
+    assert "Création de compte" in pg.inner_text("#lignes")

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titre %}Comptes · Alerte précoce{% endblock %}
+{% block contenu %}
+<header class="entete-page"><div class="titres"><div class="sur-titre">Administration</div><h1>Comptes et rôles</h1>
+  <p class="sous-titre">Un compte par personne, jamais de compte partagé : c'est ce qui rend le journal d'activité utile.
+    Le <b>conseiller</b> suit ses dossiers ; le <b>responsable</b> attribue, importe et pilote ; l'<b>administrateur</b> gère en plus les comptes et les données.</p></div>
+  <div class="actions"><button class="btn btn-plein" id="nouveau" type="button" {{ 'disabled title="Indisponible en démonstration"' | safe if mode_demo }}>Nouveau compte</button></div></header>
+<section class="carte"><div class="tableau-wrap"><table class="liste" id="comptes">
+  <thead><tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Dernière connexion</th><th>État</th><th></th></tr></thead><tbody></tbody></table></div></section>
+
+<dialog class="modale" id="modale-compte"><form class="carte-corps" id="form-compte" method="dialog">
+  <h2 id="titre-modale">Nouveau compte</h2>
+  <label class="champ-bloc"><span class="lbl">Nom affiché</span><input class="champ" name="nom" required style="width:100%"></label>
+  <label class="champ-bloc" id="bloc-identifiant"><span class="lbl">Identifiant de connexion</span><input class="champ" name="identifiant" required pattern="[A-Za-z0-9._\-]+" style="width:100%"></label>
+  <label class="champ-bloc"><span class="lbl">Courriel (rappels)</span><input class="champ" type="email" name="email" style="width:100%"></label>
+  <label class="champ-bloc"><span class="lbl">Rôle</span><select class="champ" name="role" style="width:100%">
+    {% for k, v in roles.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+  <div class="erreur-saisie" id="erreur-compte" hidden></div>
+  <div class="actions" style="justify-content:flex-end"><button class="btn" type="button" id="annuler">Annuler</button><button class="btn btn-plein" type="submit">Enregistrer</button></div>
+</form></dialog>
+<dialog class="modale" id="modale-mdp"><div class="carte-corps">
+  <h2>Mot de passe provisoire</h2>
+  <p class="texte-court">Transmettez-le à <b id="mdp-pour"></b> de vive voix ou par un canal sûr. Il ne sera plus affiché, et devra être changé à la première connexion.</p>
+  <div class="mdp-provisoire" id="mdp"></div>
+  <div class="actions" style="justify-content:flex-end"><button class="btn btn-plein" type="button" id="fermer-mdp">C'est noté</button></div>
+</div></dialog>
+{% endblock %}
+{% block scripts %}<script>window.MOI = {{ utilisateur.id }}; window.DEMO = {{ 'true' if mode_demo else 'false' }};</script>
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>{% endblock %}

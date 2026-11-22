@@ -60,6 +60,10 @@ a:hover { text-decoration:underline; }
   border-radius:0 3px 3px 0; background:var(--or); }
 .nav-lien svg { flex:none; opacity:.9; }
 .nav-lien small { display:block; font-size:11.5px; color:#8EA3BA; font-weight:400; }
+.pastille-nav { margin-left:auto; min-width:22px; height:20px; padding:0 6px; border-radius:99px; background:rgba(255,255,255,.14); color:#fff; font-size:11.5px; font-weight:700; display:grid; place-items:center; }
+.pastille-nav.rouge { background:var(--eleve); } .pastille-nav.or { background:var(--or); color:var(--nuit); }
+.avatar { width:26px; height:26px; border-radius:50%; background:var(--or); color:var(--nuit); display:grid; place-items:center; font-weight:700; font-size:12px; flex:none; }
+.barre-laterale { overflow-y:auto; }
 .barre-pied { margin-top:auto; border-top:1px solid rgba(255,255,255,.08); padding-top:12px; }
 .seuil-rappel { margin:10px 4px 12px; padding:11px 12px; border-radius:11px; background:rgba(255,255,255,.05);
   font-size:12px; color:#AFC0D3; line-height:1.45; }
@@ -314,6 +318,48 @@ table.simple { width:100%; border-collapse:collapse; font-size:12.5px; margin-to
 .formule { font:600 15px var(--titre); color:var(--encre); background:var(--surface-2); border:1px solid var(--trait); border-radius:10px; padding:10px 14px; display:inline-block; margin:8px 0; }
 .limites { margin:0; padding-left:18px; display:flex; flex-direction:column; gap:8px; font-size:13.5px; }
 
+/* ================================================================ suivi des dossiers */
+.statut { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:7px; font-size:12px; font-weight:600; white-space:nowrap; }
+.s-a_contacter { background:var(--eleve-pale); color:var(--eleve-texte); }
+.s-contacte { background:var(--moyen-pale); color:var(--moyen-texte); }
+.s-entretien { background:var(--bleu-pale); color:#1E5394; }
+.s-accompagnement { background:#EEE9F8; color:#5B3FA0; }
+.s-clos { background:var(--surface-2); color:var(--gris); border:1px solid var(--trait); }
+.onglets { display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--surface); border:1px solid var(--trait); border-radius:12px; margin-bottom:14px; width:max-content; max-width:100%; }
+.onglets a { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:9px; font-weight:600; font-size:13px; color:var(--gris); }
+.onglets a:hover { text-decoration:none; color:var(--encre); background:var(--surface-2); }
+.onglets a[aria-current] { background:var(--marine); color:#fff; }
+.onglets .compte { font-size:11.5px; padding:0 6px; border-radius:99px; background:rgba(13,56,99,.08); }
+.onglets a[aria-current] .compte { background:rgba(255,255,255,.18); }
+.retard { color:var(--eleve-texte); font-weight:700; }
+.chrono { list-style:none; margin:0; padding:0 0 0 18px; border-left:2px solid var(--trait); display:flex; flex-direction:column; gap:14px; }
+.chrono li { position:relative; }
+.chrono li::before { content:""; position:absolute; left:-25px; top:4px; width:12px; height:12px; border-radius:50%; background:#fff; border:2px solid var(--trait-fort); }
+.chrono li.humain::before { border-color:var(--marine); background:var(--marine); }
+.chrono li.systeme::before { border-color:var(--or); }
+.chrono .tete { font-size:12px; color:var(--gris); }
+.chrono .tete b { color:var(--encre); font-weight:600; }
+.chrono p { margin-top:3px; font-size:13.5px; color:var(--texte); white-space:pre-line; }
+.etapes-suivi { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:4px; margin:4px 0 16px; }
+.etapes-suivi span { height:6px; border-radius:99px; background:var(--trait); }
+.etapes-suivi span.fait { background:var(--marine); }
+.etapes-suivi + .libelles-suivi { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:4px; font-size:11px; color:var(--gris); margin-top:-10px; margin-bottom:14px; }
+.formulaire-ligne { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+textarea.champ { height:auto; min-height:70px; padding:9px 11px; resize:vertical; width:100%; font:14px/1.45 var(--corps); }
+.pile { display:flex; flex-direction:column; gap:10px; }
+.grille-2 { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+.bandeau { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:14px 18px; }
+.bandeau .info { display:flex; flex-direction:column; gap:2px; font-size:12px; color:var(--gris); }
+.bandeau .info b { font-size:14px; color:var(--encre); font-weight:600; }
+.selection { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 16px; background:var(--or-pale); border-bottom:1px solid var(--trait); font-size:13px; }
+#notifications { position:fixed; right:18px; bottom:18px; z-index:200; display:flex; flex-direction:column; gap:8px; }
+.notification { padding:11px 16px; border-radius:11px; background:var(--marine); color:#fff; font-weight:600; font-size:13.5px; box-shadow:0 10px 30px rgba(7,28,51,.25); }
+.notification.erreur { background:var(--eleve-texte); }
+dialog.modale { border:0; border-radius:16px; padding:0; width:min(520px, calc(100vw - 32px)); box-shadow:0 30px 80px rgba(7,28,51,.35); }
+dialog.modale::backdrop { background:rgba(7,28,51,.35); }
+dialog.modale .carte-corps { display:flex; flex-direction:column; gap:12px; }
+.mdp-provisoire { font:700 20px var(--titre); letter-spacing:.04em; padding:12px; border-radius:10px; background:var(--or-pale); text-align:center; user-select:all; }
+
 /* ================================================================ voile de chargement */
 .voile-chargement { position:fixed; inset:0; z-index:100; display:grid; place-items:center; background:rgba(7,28,51,.28);
   backdrop-filter:blur(3px); opacity:0; pointer-events:none; transition:opacity .2s; }
@@ -345,6 +391,7 @@ table.simple { width:100%; border-collapse:collapse; font-size:12.5px; margin-to
   .indicateurs { grid-template-columns:repeat(2, minmax(0,1fr)); }
   #ligne-1, #ligne-2, #ligne-3 { grid-template-columns:minmax(0,1fr) !important; }
   #choix-cohorte { min-width:0 !important; width:100%; }
+  .grille-2, .etapes-suivi + .libelles-suivi { grid-template-columns:1fr 1fr; }
   .capacite, .deux-colonnes, .trois, .correspondances, .champs, .dossier { grid-template-columns:1fr; }
 }
 @media (max-width:520px) { .marque > span:last-child { display:none; } .barre-laterale { flex-wrap:nowrap; } }

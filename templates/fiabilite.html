@@ -14,6 +14,17 @@
 
 <section class="indicateurs" id="kpis"></section>
 
+<section class="carte" style="margin-bottom:16px" id="surveillance">
+  <div class="carte-tete"><h2>Sur votre établissement</h2><span class="discret">modèle en service : {{ modele_version }}</span></div>
+  <div class="carte-corps">
+    <p class="texte-court" style="margin-bottom:14px">Les chiffres de référence viennent d'une autre université. Dès que le devenir réel de vos étudiants
+      est connu (fin d'année), l'outil recalcule ses performances sur eux et signale tout écart net : il faudra alors
+      recalibrer ou réentraîner le modèle, selon la procédure du guide de mise en service.</p>
+    <div class="tableau-wrap"><table class="simple" id="table-surveillance"></table></div>
+    <div id="signaux-surveillance" class="pile" style="margin-top:12px"></div>
+  </div>
+</section>
+
 <div class="grille" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); margin-bottom:16px" id="ligne-1">
   <section class="carte">
     <div class="carte-tete"><h2>Si nous accompagnons une part des étudiants…</h2></div>

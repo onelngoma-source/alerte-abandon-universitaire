@@ -75,35 +75,44 @@ def test_la_base_demarre_vide_puis_le_jeu_de_test_se_charge_une_seule_fois(clien
     assert len(client.get("/api/cohortes").json) == 1
 
 
+def _compter(*tables):
+    from sqlalchemy import func, select
+    with db.connexion() as c:
+        return [c.execute(select(func.count()).select_from(t)).scalar() for t in tables]
+
+
 def test_suppression_en_cascade_et_remise_a_zero(client, contenu_jeu_de_test):
     cohorte = client.post("/api/cohortes/jeu-de-test").json["cohorte_id"]
-    with db.connecter() as c:
-        assert c.execute("SELECT COUNT(*) FROM score").fetchone()[0] == 2 * 1227
+    assert _compter(db.etudiant, db.evaluation) == [1227, 1227]
+    assert _compter(db.dossier)[0] == 455  # un dossier ouvert pour chaque etudiant en alerte
     client.delete(f"/api/cohortes/{cohorte}")
-    with db.connecter() as c:
-        assert [c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in ("cohorte", "etudiant", "score")] == [0, 0, 0]
+    assert _compter(db.promotion, db.etudiant, db.evaluation, db.dossier, db.action) == [0, 0, 0, 0, 0]
     televerser(client, contenu_jeu_de_test)
     client.post("/api/cohortes/vider")
     assert client.get("/api/cohortes").json == []
 
 
 def test_le_schema_impose_les_contraintes(client):
-    import sqlite3
     import pytest
+    from sqlalchemy.exc import IntegrityError
     client.post("/api/cohortes/jeu-de-test")
-    with db.connecter() as c:
-        with pytest.raises(sqlite3.IntegrityError):
-            c.execute("INSERT INTO score VALUES (1, 'noyau', 0.5, 'faible', 'complet')")  # cle primaire deja prise
-        with pytest.raises(sqlite3.IntegrityError):
-            c.execute("INSERT INTO score VALUES (1, 'xgb', 0.5, 'faible', 'complet')")    # modele inconnu
+    with pytest.raises(IntegrityError):
+        with db.connexion() as c:  # meme matricule deux fois dans une promotion
+            c.execute(db.etudiant.insert().values(promotion_id=1, matricule="E-0010", cree_le=db.maintenant(), maj_le=db.maintenant()))
+    with pytest.raises(IntegrityError):
+        with db.connexion() as c:  # statut inconnu
+            c.execute(db.dossier.update().where(db.dossier.c.id == 1).values(statut="oublie"))
+    with pytest.raises(IntegrityError):
+        with db.connexion() as c:  # dossier clos sans motif
+            c.execute(db.dossier.update().where(db.dossier.c.id == 1).values(statut="clos"))
 
 
 def test_par_defaut_les_donnees_sont_deja_affichees_au_demarrage(app_prechargee):
-    """Consigne de l'encadreur : au lancement, le tableau de bord contient deja les 1 227 etudiants de test (cohortes 2015 a 2017)."""
-    c = app_prechargee.test_client()
-    c.post("/connexion", data={"identifiant": "admin", "mot_de_passe": "changez-moi"})
+    """Consigne de l'encadreur : au lancement, les 1 227 etudiants de test (cohortes 2015 a 2017) sont deja la."""
+    from conftest import connecter
+    c = connecter(app_prechargee)
     cohortes = c.get("/api/cohortes").json
-    assert len(cohortes) == 1 and cohortes[0]["origine"] == "test_uci" and cohortes[0]["effectif"] == 1227
+    assert len(cohortes) == 1 and cohortes[0]["origine"] == "demonstration" and cohortes[0]["effectif"] == 1227
     assert len(c.get(f"/api/cohortes/{cohortes[0]['id']}").json["lignes"]) == 1227
 
 

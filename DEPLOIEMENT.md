@@ -1,6 +1,14 @@
-# Mettre l'application en ligne sur Render
+# Mettre la démonstration en ligne sur Render
 
 Objectif : une adresse publique, stable, gratuite, que le jury peut ouvrir depuis son téléphone.
+Ce document concerne la **démonstration** (`MODE_DEMO=1`, base SQLite éphémère, comptes fictifs). Pour une installation
+réelle dans un établissement (PostgreSQL, HTTPS, comptes nominatifs, rappels), suivre le
+[guide de mise en service](GUIDE_MISE_EN_SERVICE.md).
+
+En démonstration, la page de connexion propose quatre comptes fictifs (administrateur, responsable, deux conseillers,
+mot de passe « demo ») et le suivi est déjà engagé sur les cohortes 2015 à 2017. Le compte du jury, déclaré par
+`ADMIN_IDENTIFIANT` et `ADMIN_MDP_HACHE`, s'y ajoute avec le rôle d'administrateur. Comme la base est recréée à chaque
+redémarrage du service, ce que les visiteurs modifient disparaît au réveil suivant.
 
 ---
 
@@ -10,8 +18,7 @@ Hugging Face a rendu les Spaces **Docker** et **Gradio** payants. Seuls les Spac
 gratuits, et un Static ne sert que des fichiers : il ne peut pas faire tourner une application Flask.
 
 Render reste gratuit, sans carte bancaire, avec **512 Mo de mémoire**. La pointe mesurée de cette
-application, avec le tableau de bord complet et dix fiches ouvertes, est de **251 Mo** (358 Mo pour la
-version du mémoire, avec SHAP et la forêt aléatoire). La marge suffit largement à plusieurs visiteurs simultanés.
+application en démonstration, après un parcours complet des pages par trois comptes, est de **363 Mo**. La marge suffit largement à plusieurs visiteurs simultanés.
 
 Deux contreparties à connaître.
 
@@ -137,21 +144,20 @@ code seul à poser sur une diapositive existante.
 
 ## Le mode démonstration
 
-Le `Dockerfile` active `MODE_DEMO=1`. Ce mode a été ajouté pour que trois jurés puissent se connecter en
-même temps sans se gêner. Il change trois choses.
+Le `Dockerfile` active `MODE_DEMO=1`. Ce mode permet à plusieurs personnes (jurés, recruteurs) d'essayer l'outil
+en même temps, dans chacun des trois rôles.
 
-**Les cohortes sont cloisonnées par visiteur.** Chaque navigateur reçoit un identifiant propre. Un juré
-qui importe un fichier est le seul à voir la cohorte qui en résulte, et le seul à pouvoir ouvrir les
-fiches de ses étudiants.
+**Des comptes fictifs prêts à l'emploi.** Administrateur, responsable, deux conseillers, mot de passe « demo »,
+proposés en un clic sur la page de connexion. Le compte du jury s'y ajoute.
 
-**La cohorte de référence reste partagée.** Les 1 227 étudiants du jeu de test sont visibles de tous, en
-lecture seule, et personne ne peut les supprimer.
+**Un suivi déjà engagé.** 455 dossiers ouverts par la règle d'alerte sur les cohortes 2015 à 2017, dont 260 déjà
+attribués et plus ou moins avancés (contacts, entretiens, tutorats, clôtures), avec des dates étalées sur quarante
+jours : les pages « Dossiers » et « Pilotage » ont de quoi montrer.
 
-**Les actions destructrices sont bloquées.** Les boutons « Supprimer cette cohorte » et « Vider la base »
-disparaissent, et les routes correspondantes répondent 403 même appelées directement.
+**Rien de destructeur.** Suppression de la promotion de démonstration, vidage de la base, création ou modification
+de comptes et purge répondent 403, même appelés directement.
 
-Huit tests automatisés couvrent ces garanties. En local, sans la variable `MODE_DEMO`, l'application se
-comporte exactement comme avant.
+Ces garanties sont couvertes par les tests de `tests/test_mode_demonstration.py`.
 
 ---
 
@@ -161,8 +167,8 @@ comporte exactement comme avant.
 une heure avant la soutenance** pour la réveiller, et reconnecte-toi dix minutes avant pour qu'elle ne se
 soit pas rendormie. Quinze minutes d'inactivité suffisent à la renvoyer en veille.
 
-**Le système de fichiers est éphémère.** Toute cohorte importée par un juré disparaît au prochain
-redémarrage. Ce n'est pas un défaut ici : la base de référence se reconstruit seule en 4,4 secondes à
+**Le système de fichiers est éphémère.** Tout ce qu'un visiteur modifie (dossiers, imports) disparaît au prochain
+redémarrage. Ce n'est pas un défaut ici : la base de démonstration se reconstruit seule en 3 secondes environ à
 partir du CSV, et c'est même souhaitable pour une démonstration.
 
 **750 heures par mois.** Un seul service en fonctionnement continu consomme 744 heures, donc le quota

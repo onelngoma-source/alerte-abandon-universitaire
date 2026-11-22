@@ -15,6 +15,7 @@ Chaine de calcul (projet de recherche github.com/onelngoma-source/abandon-univer
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import joblib
@@ -110,6 +111,14 @@ def variables_du_moment(moment: str) -> list[str]:
     return NOMINALES + BINAIRES + NUMERIQUES_T0 + [c for s in MOMENTS[moment] for c in semestre(s)]
 
 
+VERSION_DE_BASE = "RL-2026.1 (cohortes 2008 à 2014)"
+
+
+def recalibrer(p: np.ndarray, a: float, b: float) -> np.ndarray:
+    p = np.clip(p, 1e-6, 1 - 1e-6)
+    return 1 / (1 + np.exp(-(a + b * np.log(p / (1 - p)))))
+
+
 class Moteur:
     def __init__(self, racine: Path = RACINE):
         art = joblib.load(racine / "models" / "modeles.joblib")
@@ -121,6 +130,10 @@ class Moteur:
         self.defauts = art["defauts"]
         self.reference = art["reference"]                 # evaluation finale pre-enregistree (cohortes 2015 a 2017)
         self._voisins = art["voisins"]
+        # recalibration facultative sur l'etablissement (scripts/recalibrer.py) : p' = sigmoide(a + b x logit(p)),
+        # une paire (a, b) par moment. Elle corrige le niveau des probabilites sans changer l'ordre des etudiants.
+        chemin = Path(os.environ.get("RECALIBRATION", racine / "models" / "recalibration.joblib"))
+        self.recalibration = joblib.load(chemin) if chemin.is_file() else None
         self.noms_canoniques = {self.normaliser(v): v for v in self.variables}
 
     # ------------------------------------------------------------------ utilitaires
@@ -184,7 +197,16 @@ class Moteur:
     def _probabilites(self, completees: pd.DataFrame, moment: str):
         X, *_ = preparer(completees, moment)
         m = self.modeles[moment]
-        return (m["noyau"].predict_proba(X)[:, 1], m["logistique"].predict_proba(X)[:, 1], X)
+        p_ml = m["logistique"].predict_proba(X)[:, 1]
+        if self.recalibration and moment in self.recalibration["parametres"]:
+            p_ml = recalibrer(p_ml, *self.recalibration["parametres"][moment])
+        return m["noyau"].predict_proba(X)[:, 1], p_ml, X
+
+    @property
+    def version(self) -> str:
+        if not self.recalibration:
+            return VERSION_DE_BASE
+        return f"{VERSION_DE_BASE}, recalibré le {self.recalibration['date']} sur {self.recalibration['effectif']} étudiants"
 
     # ------------------------------------------------------------------ scores d'une cohorte
     def scorer_valeurs(self, valeurs: pd.DataFrame) -> pd.DataFrame:

@@ -1,42 +1,57 @@
 {% extends "base.html" %}
-{% block titre %}{{ reference }} · Alerte précoce{% endblock %}
+{% block titre %}{{ nom or reference }} · Alerte précoce{% endblock %}
 {% block contenu %}
-<a class="fil-ariane" href="{{ url_for('tableau.page', cohorte=cohorte.id) }}">
+<a class="fil-ariane" href="#" id="retour">
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-  Suivi de cohorte · {{ cohorte.nom }}</a>
+  <span id="retour-texte">Suivi de cohorte · {{ cohorte.nom }}</span></a>
 <header class="entete-page">
   <div class="titres">
     <div class="sur-titre">Fiche étudiant</div>
-    <h1>{{ reference }}</h1>
+    <h1>{{ nom or reference }}</h1>
     <p class="sous-titre" id="identite">&nbsp;</p>
   </div>
   <div class="actions">
     <a class="btn" id="precedent" hidden>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Précédent</a>
-    <a class="btn" id="suivant" hidden>Suivant dans la file
+    <a class="btn" id="suivant" hidden>Suivant
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></a>
   </div>
 </header>
+<div id="suivi" style="margin-bottom:16px"></div>
 <div id="fiche"><div class="carte etat-vide"><span class="anneau" style="display:inline-block"></span></div></div>
+<div id="historique" style="margin-top:16px"></div>
 {% endblock %}
 
 {% block scripts %}
+<script>window.UTILISATEUR_ID = {{ utilisateur.id }};</script>
 <script src="{{ url_for('static', filename='js/fiche.js') }}"></script>
+<script src="{{ url_for('static', filename='js/suivi.js') }}"></script>
 <script>
-(async function () {
+(function () {
   const id = {{ etudiant_id }};
-  const res = await fetch('/api/etudiants/' + id);
-  const d = await res.json();
-  const cible = document.getElementById('fiche');
-  if (!res.ok) { cible.innerHTML = `<div class="erreur-saisie">${Commun.echapper(d.erreur || 'Erreur')}</div>`; return; }
-  const filiere = (d.profil.find((p) => p.variable === 'Filière') || {}).valeur;
-  const age = (d.profil.find((p) => p.variable.startsWith('Âge')) || {}).valeur;
-  document.getElementById('identite').textContent = [filiere, age ? age + ' ans à l\'inscription' : null, d.cohorte].filter(Boolean).join(' · ');
-  Fiche.rendre(cible, d);
+  const cohorte = {{ cohorte.id }};
+  const retour = document.getElementById('retour');
+  const depuisDossiers = document.referrer.includes('/dossiers');
+  retour.href = depuisDossiers ? document.referrer : '/tableau?cohorte=' + cohorte;
+  if (depuisDossiers) document.getElementById('retour-texte').textContent = 'Dossiers';
 
-  // navigation dans la file d'attente telle qu'elle etait affichee dans le suivi de cohorte
+  async function charger() {
+    const res = await fetch('/api/etudiants/' + id);
+    const d = await res.json();
+    const cible = document.getElementById('fiche');
+    if (!res.ok) { cible.innerHTML = `<div class="erreur-saisie">${Commun.echapper(d.erreur || 'Erreur')}</div>`; return; }
+    const filiere = (d.profil.find((p) => p.champ === 'Course') || {}).valeur;
+    const age = (d.profil.find((p) => p.champ === 'Age at enrollment') || {}).valeur;
+    const morceaux = [d.nom ? d.reference : null, filiere, age ? age + " ans à l'inscription" : null, d.cohorte,
+      d.email, d.telephone, d.referent ? 'Référent : ' + d.referent.nom : null];
+    document.getElementById('identite').textContent = morceaux.filter(Boolean).join(' · ');
+    Fiche.rendre(cible, d);
+    Suivi.rendre(document.getElementById('suivi'), d, charger);
+  }
+  charger();
+
   try {
-    const file = JSON.parse(sessionStorage.getItem('file-' + d.cohorte_id) || '[]');
+    const file = JSON.parse(sessionStorage.getItem('file-' + cohorte) || '[]');
     const i = file.indexOf(id);
     if (i >= 0) {
       if (i > 0) { const a = document.getElementById('precedent'); a.href = '/etudiants/' + file[i - 1]; a.hidden = false; }

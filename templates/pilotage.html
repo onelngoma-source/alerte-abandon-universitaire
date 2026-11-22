@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titre %}Pilotage · Alerte précoce{% endblock %}
+{% block contenu %}
+<header class="entete-page">
+  <div class="titres">
+    <div class="sur-titre">Pilotage du dispositif</div>
+    <h1>Les alertes sont-elles suivies, et à temps&nbsp;?</h1>
+    <p class="sous-titre">Un outil d'alerte n'a d'effet que si chaque alerte aboutit à un contact. Cette page suit les délais,
+      la charge des conseillers et, en fin d'année, ce que sont devenus les étudiants suivis.</p>
+  </div>
+  <div class="actions">
+    <select class="champ" id="promotion" aria-label="Promotion"><option value="">Toutes les promotions</option>
+      {% for p in promotions %}<option value="{{ p.id }}">{{ p.nom }}</option>{% endfor %}</select>
+  </div>
+</header>
+<section class="indicateurs" id="kpis"></section>
+<div class="grille" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); margin-bottom:16px" id="ligne-1">
+  <section class="carte"><div class="carte-tete"><h2>Charge des conseillers</h2></div>
+    <div class="carte-corps"><div class="tableau-wrap"><table class="simple" id="charge"></table></div>
+      <p class="discret petit" style="margin-top:10px">Un compte désactivé rend ses dossiers ouverts « non attribués » : rien ne reste en souffrance.</p></div></section>
+  <section class="carte"><div class="carte-tete"><h2>Où en sont les dossiers</h2></div>
+    <div class="carte-corps"><div class="barres" id="statuts"></div></div></section>
+</div>
+<div class="grille" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)" id="ligne-2">
+  <section class="carte"><div class="carte-tete"><h2>Actions menées</h2><span class="discret">90 derniers jours</span></div>
+    <div class="carte-corps"><div class="barres" id="actions"></div></div></section>
+  <section class="carte"><div class="carte-tete"><h2>Motifs de clôture</h2></div>
+    <div class="carte-corps"><div class="barres" id="motifs"></div></div></section>
+  <section class="carte"><div class="carte-tete"><h2>En fin d'année</h2></div>
+    <div class="carte-corps" id="resultats"></div></section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/pilotage.js') }}"></script>{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titre %}Mon compte · Alerte précoce{% endblock %}
+{% block contenu %}
+<header class="entete-page"><div class="titres"><div class="sur-titre">Mon compte</div><h1>{{ utilisateur.nom }}</h1>
+  <p class="sous-titre">{{ roles[utilisateur.role] }} · identifiant « {{ utilisateur.identifiant }} »</p></div></header>
+{% if utilisateur.doit_changer_mdp %}
+<div class="encart or" style="margin-bottom:16px"><div><b>Choisissez votre mot de passe.</b> Le mot de passe provisoire qui vous a été remis
+  doit être remplacé avant d'accéder aux données des étudiants.</div></div>
+{% endif %}
+<section class="carte" style="max-width:520px"><div class="carte-tete"><h2>Changer de mot de passe</h2></div>
+  <form class="carte-corps pile" id="form-mdp">
+    <label class="champ-bloc"><span class="lbl">Mot de passe actuel</span><input class="champ" type="password" name="actuel" autocomplete="current-password" required style="width:100%"></label>
+    <label class="champ-bloc"><span class="lbl">Nouveau mot de passe</span><input class="champ" type="password" name="nouveau" autocomplete="new-password" required minlength="{{ longueur_min }}" style="width:100%">
+      <span class="aide">{{ longueur_min }} caractères au moins, lettres et chiffres mélangés.</span></label>
+    <label class="champ-bloc"><span class="lbl">Confirmer</span><input class="champ" type="password" name="confirmation" autocomplete="new-password" required style="width:100%"></label>
+    <div class="erreur-saisie" id="erreur" hidden></div>
+    <div><button class="btn btn-plein" type="submit">Enregistrer</button></div>
+  </form></section>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('form-mdp').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, err = document.getElementById('erreur');
+  err.hidden = true;
+  if (f.nouveau.value !== f.confirmation.value) { err.textContent = 'Les deux mots de passe ne correspondent pas.'; err.hidden = false; return; }
+  try {
+    const r = await Commun.api('/api/compte/mot-de-passe', { actuel: f.actuel.value, nouveau: f.nouveau.value });
+    Commun.notifier('Mot de passe modifié.'); setTimeout(() => { location.href = r.suivant; }, 700);
+  } catch (x) { err.textContent = x.message; err.hidden = false; }
+});
+</script>
+{% endblock %}

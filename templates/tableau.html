@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block titre %}Suivi de cohorte · Alerte précoce{% endblock %}
 {% block contenu %}
-{% set a_jeu_de_test = cohortes | selectattr('origine', 'equalto', 'test_uci') | list | length > 0 %}
+{% set a_jeu_de_test = cohortes | selectattr('origine', 'equalto', 'demonstration') | list | length > 0 %}
+{% set gestion = utilisateur.role in ('responsable', 'admin') %}
 <header class="entete-page">
   <div class="titres">
     <div class="sur-titre">Suivi de cohorte</div>
@@ -15,9 +16,10 @@
     <select id="choix-cohorte" class="champ" style="min-width:250px">
       {% for c in cohortes %}<option value="{{ c.id }}" {{ 'selected' if c.id == courante }}>{{ c.nom }} · {{ '{:,}'.format(c.effectif).replace(',', ' ') }} étudiants</option>{% endfor %}
     </select>
-    <a class="btn" href="{{ url_for('import_csv.page') }}">Importer</a>
-    {% if not a_jeu_de_test %}<button class="btn" type="button" id="btn-charger-test">Charger le jeu de test</button>{% endif %}
-    {% if not mode_demo %}<button class="btn btn-danger" type="button" id="btn-supprimer" title="Supprimer cette cohorte">
+    <a class="btn" id="btn-export" href="#">Exporter la file</a>
+    {% if gestion %}<a class="btn" id="btn-importer" href="{{ url_for('import_csv.page') }}">Mettre à jour</a>{% endif %}
+    {% if gestion and not a_jeu_de_test %}<button class="btn" type="button" id="btn-charger-test">Charger le jeu de test</button>{% endif %}
+    {% if utilisateur.role == 'admin' %}<button class="btn btn-danger" type="button" id="btn-supprimer" title="Supprimer cette promotion">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
       <span class="visuellement-cache">Supprimer cette cohorte</span></button>{% endif %}
   </div>
@@ -27,12 +29,14 @@
 {% if not cohortes %}
 <section class="carte etat-vide" id="etat-vide">
   <span class="cercle"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/></svg></span>
-  <h2>Aucune cohorte pour l'instant</h2>
+  <h2>Aucune promotion pour l'instant</h2>
+  {% if gestion %}
   <p>Importez le fichier de vos étudiants, ou chargez les 1 227 étudiants des cohortes 2015 à 2017 pour découvrir l'outil.</p>
   <div class="actions" style="justify-content:center">
-    <button class="btn btn-plein" type="button" id="btn-charger-test-vide">Charger le jeu de test</button>
-    <a class="btn" href="{{ url_for('import_csv.page') }}">Importer un fichier</a>
+    <a class="btn btn-plein" href="{{ url_for('import_csv.page') }}">Importer une promotion</a>
+    <button class="btn" type="button" id="btn-charger-test-vide">Charger le jeu de test</button>
   </div>
+  {% else %}<p>Le responsable ou l'administrateur doit d'abord importer une promotion.</p>{% endif %}
 </section>
 {% else %}
 <div id="cohorte-vue">
@@ -63,7 +67,7 @@
     <section class="carte">
       <div class="outils">
         <div class="recherche"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-          <input class="champ" type="search" id="recherche" placeholder="Rechercher une référence" aria-label="Rechercher une référence"></div>
+          <input class="champ" type="search" id="recherche" placeholder="Rechercher un nom ou un matricule" aria-label="Rechercher un nom ou un matricule"></div>
         <div class="segments" role="group" aria-label="Niveau de risque" id="niveaux">
           <button type="button" data-niveau="tous" aria-pressed="true">Tous</button>
           <button type="button" data-niveau="alerte" aria-pressed="false">En alerte</button>
@@ -77,7 +81,7 @@
       </div>
       <div class="tableau-wrap">
         <table class="liste">
-          <thead><tr><th>Rang</th><th>Étudiant</th><th>Risque d'abandon</th><th>Ce qui pèse le plus</th><th>Signaux</th><th>Estimé</th><th class="col-devenir" hidden>Devenir réel</th></tr></thead>
+          <thead><tr><th>Rang</th><th>Étudiant</th><th>Risque d'abandon</th><th>Ce qui pèse le plus</th><th>Signaux</th><th>Suivi</th><th class="col-devenir" hidden>Devenir réel</th></tr></thead>
           <tbody id="lignes"></tbody>
         </table>
       </div>
@@ -115,7 +119,12 @@
   const courante = {{ courante if courante else 'null' }};
   const choix = document.getElementById('choix-cohorte');
   if (courante) Cohorte.charger(courante);
-  if (choix) choix.addEventListener('change', () => { history.replaceState(null, '', '/tableau?cohorte=' + choix.value); Cohorte.charger(choix.value); });
+  const majLiens = () => {
+    const e = document.getElementById('btn-export'); if (e && choix) e.href = '/api/cohortes/' + choix.value + '/export.csv';
+    const i = document.getElementById('btn-importer'); if (i && choix) i.href = '/import?promotion=' + choix.value;
+  };
+  majLiens();
+  if (choix) choix.addEventListener('change', () => { history.replaceState(null, '', '/tableau?cohorte=' + choix.value); Cohorte.charger(choix.value); majLiens(); });
 
   async function chargerTest() {
     Chargement.afficher('Calcul du risque des 1 227 étudiants');
@@ -125,7 +134,7 @@
   ['btn-charger-test', 'btn-charger-test-vide'].forEach((id) => { const b = document.getElementById(id); if (b) b.addEventListener('click', chargerTest); });
   const bs = document.getElementById('btn-supprimer');
   if (bs) bs.addEventListener('click', async () => {
-    if (!confirm('Supprimer cette cohorte de la base ?')) return;
+    if (!confirm('Supprimer définitivement cette promotion, ses étudiants et leurs dossiers ?')) return;
     const r = await fetch('/api/cohortes/' + choix.value, { method: 'DELETE' });
     if (!r.ok) { alert((await r.json()).erreur || 'Suppression impossible.'); return; }
     location.href = '/tableau';

@@ -170,10 +170,10 @@ def test_sans_les_variables_supplementaires_le_tableau_differe(client, moteur, c
 
 def test_colonne_inconnue_dans_un_fichier_complet_declenche_la_correspondance(client, contenu_jeu_de_test):
     df = pd.read_csv(io.BytesIO(contenu_jeu_de_test), dtype=str)
-    df["Nom"] = "X"
+    df["Commentaire"] = "X"
     analyse = client.post("/api/analyser-fichier", data={"fichier": (io.BytesIO(df.to_csv(index=False).encode()), "x.csv")},
                           content_type="multipart/form-data").json
-    assert analyse["mapping_necessaire"] is True and analyse["colonnes_non_reconnues"] == ["Nom"]
+    assert analyse["mapping_necessaire"] is True and analyse["colonnes_non_reconnues"] == ["Commentaire"]
     assert analyse["suggestions"]["Course"] == "Course" and analyse["suggestions"]["Gender"] == "Gender"
     # le fichier d'origine, lui, est traite directement
     direct = client.post("/api/analyser-fichier", data={"fichier": (io.BytesIO(contenu_jeu_de_test), "x.csv")},

@@ -26,7 +26,8 @@ RUN mkdir -p instance && chmod -R 777 instance
 EXPOSE 10000
 
 # Forme shell, et non exec, pour que ${PORT} soit bien substitue au demarrage.
-# MODE_DEMO=1 : cohortes cloisonnees par visiteur, suppression et vidage desactives.
+# MODE_DEMO=1 : comptes fictifs, suivi deja engage, aucune operation destructrice. Pour un etablissement,
+# MODE_DEMO=0 et DATABASE_URL (PostgreSQL) : voir GUIDE_MISE_EN_SERVICE.md.
 # 1 worker et 4 threads : les modeles sont charges une seule fois en memoire
-# (358 Mo mesures en pointe), et les trois jures sont servis par les threads.
+# (363 Mo mesures en pointe), et les visiteurs simultanes sont servis par les threads.
 CMD gunicorn -w 1 --threads 4 --timeout 120 -b 0.0.0.0:${PORT:-10000} app:app

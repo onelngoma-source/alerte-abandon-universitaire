@@ -34,7 +34,7 @@
     return etat.lignes.filter((l) => {
       if (etat.prioritaires && l.rang > N) return false;
       if (etat.filiere && (l.filiere || 'Non renseignée') !== etat.filiere) return false;
-      if (q && !String(l.reference).toLowerCase().includes(q)) return false;
+      if (q && !(String(l.reference) + ' ' + (l.nom || '')).toLowerCase().includes(q)) return false;
       if (etat.niveau === 'alerte') return enAlerte(l.p_ml);
       if (etat.niveau !== 'tous') return niveau(l.p_ml) === etat.niveau;
       return true;
@@ -129,11 +129,11 @@
       const devenir = l.abandon_reel === 1 ? '<span class="badge eleve">Abandon</span>' : l.abandon_reel === 0 ? '<span class="badge faible">Poursuite</span>' : '–';
       return `<tr class="${classes}" data-id="${l.id}" tabindex="0" aria-label="Ouvrir la fiche de ${echapper(l.reference)}">
         <td class="rang tnum">${l.rang}</td>
-        <td class="etudiant"><b>${echapper(l.reference)}</b><span>${echapper(l.filiere || 'Filière non renseignée')}</span></td>
+        <td class="etudiant"><b>${echapper(l.nom || l.reference)}</b><span>${echapper(l.filiere || 'Filière non renseignée')} · ${{ T0: 'inscription', T1: 'semestre 1', T2: 'semestre 2' }[l.mode]}</span></td>
         <td><div class="risque-cellule"><span class="pct tnum">${Math.round(100 * l.p_ml)} %</span>${jauge(l.p_ml)}${badge(l.p_ml)}</div></td>
         <td class="facteur">${alerte && l.facteur ? `${echapper(l.facteur)}<span class="dom">${DOMAINES[l.domaine_facteur] || ''}</span>` : '<span class="discret">–</span>'}</td>
         <td><div class="signaux">${signaux(l)}</div></td>
-        <td class="petit discret">${{ T0: 'Inscr.', T1: 'S1', T2: 'S2' }[l.mode]}</td>
+        <td>${l.dossier_statut ? `${Commun.statut(l.dossier_statut)}<span class="dom">${echapper(l.conseiller || 'non attribué')}</span>` : '<span class="discret">–</span>'}</td>
         <td class="col-devenir" ${etat.devenir ? '' : 'hidden'}>${devenir}</td></tr>`;
     }).join('');
     $('aucun').hidden = liste.length > 0;

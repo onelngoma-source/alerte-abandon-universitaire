@@ -63,4 +63,19 @@
   $('table-comparaison').innerHTML = `<thead><tr><th>Modèle</th><th>Inscription</th><th>Semestre 1</th><th>Semestre 2</th><th>Brier S2</th></tr></thead><tbody>`
     + d.comparaison.map((m, i) => `<tr${i === 0 ? ' class="retenu"' : ''}><td>${m.modele}${m.role ? `<br><span class="discret" style="font-weight:400">${m.role}</span>` : ''}</td>
       ${['T0', 'T1', 'T2'].map((k) => `<td class="tnum">${m.auc[k] === null ? '–' : dec(m.auc[k])}</td>`).join('')}<td class="tnum">${dec(m.brier_t2)}</td></tr>`).join('') + '</tbody>';
+
+  const s = await (await fetch('/api/surveillance')).json();
+  const demo = s.etablissement.devenirs_connus === 0 && s.demonstration.devenirs_connus > 0;
+  const etat = demo ? s.demonstration : s.etablissement;
+  $('table-surveillance').innerHTML = `<thead><tr><th>Moment</th><th>Devenirs connus</th><th>ROC-AUC (référence)</th><th>Risque annoncé / abandons observés</th><th>Repérés</th><th>Alertes justes</th></tr></thead><tbody>`
+    + etat.moments.map((m) => m.suffisant
+      ? `<tr><td>${MOMENTS[m.moment]}</td><td class="tnum">${nombre(m.effectif)} (${nombre(m.abandons)} abandons)</td>
+         <td class="tnum ${m.auc < m.reference.auc - 0.05 ? 'faible-detection' : ''}">${dec(m.auc)} (${dec(m.reference.auc)})</td>
+         <td class="tnum">${pct(m.risque_moyen)} / ${pct(m.taux_observe)}</td><td class="tnum">${pct(m.rappel)}</td><td class="tnum">${pct(m.precision)}</td></tr>`
+      : `<tr><td>${MOMENTS[m.moment]}</td><td class="tnum">${nombre(m.effectif)}</td><td colspan="4" class="discret">Pas encore assez de devenirs connus
+         (${s.etablissement.effectif_min} étudiants et ${s.etablissement.abandons_min} abandons au moins).</td></tr>`).join('') + '</tbody>';
+  const signaux = etat.moments.flatMap((m) => (m.signaux || []).map((x) => `<b>${MOMENTS[m.moment]}</b> : ${x}`));
+  $('signaux-surveillance').innerHTML = (demo ? '<div class="encart">Démonstration : faute de devenirs connus dans l\'établissement, le tableau montre le calcul sur la promotion de démonstration.</div>' : '')
+    + (signaux.length ? signaux.map((x) => `<div class="encart rouge"><div>${x}</div></div>`).join('')
+      : etat.moments.some((m) => m.suffisant) ? '<div class="encart"><div>Aucun écart notable avec la référence.</div></div>' : '');
 })();

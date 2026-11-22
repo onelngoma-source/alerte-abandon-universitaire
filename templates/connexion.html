@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230D3863'/%3E%3Cpath d='M8 21l5-6 4 4 7-9' stroke='%23F7FFBD' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/connexion.css') }}">
 </head>
-<body class="page-connexion{{ ' avec-image' if fond }}"
+<body class="page-connexion{{ ' avec-image' if fond }}{{ ' avec-demo' if demo }}"
       {% if fond %}style="--image-fond:url('{{ fond }}'); --voile-fond:{{ voile / 100 }};"{% endif %}>
 
 <div class="fond" id="fond" aria-hidden="true"><canvas id="aurore"></canvas></div>
@@ -105,6 +105,26 @@
             </button>
           </form>
 
+          {% if demo %}
+          <div class="comptes-demo">
+            <b>Démonstration</b> · choisissez un compte (mot de passe « {{ mdp_demo }} ») :
+            <div class="liste-comptes">
+              {% for identifiant, nom, role in comptes_demo %}
+              <button type="button" data-compte="{{ identifiant }}">{{ roles[role] }}<small>{{ identifiant }}</small></button>
+              {% endfor %}
+            </div>
+          </div>
+          <script>
+            document.querySelectorAll('[data-compte]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                document.getElementById('identifiant').value = b.dataset.compte;
+                document.getElementById('mot_de_passe').value = '{{ mdp_demo }}';
+                document.getElementById('formulaire-connexion').requestSubmit();
+              });
+            });
+          </script>
+          {% endif %}
+
           <p class="assurance">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -115,7 +135,7 @@
         </div>
 
         <p class="pied">
-          <span><span class="pastille-or"></span>Accès réservé aux conseillers</span>
+          <span><span class="pastille-or"></span>Accès réservé à l'équipe d'accompagnement</span>
           <span class="version">Alerte précoce · 2026</span>
         </p>
       </section>

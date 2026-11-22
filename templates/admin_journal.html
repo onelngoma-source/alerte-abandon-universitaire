@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titre %}Journal · Alerte précoce{% endblock %}
+{% block contenu %}
+<header class="entete-page"><div class="titres"><div class="sur-titre">Administration</div><h1>Journal d'activité</h1>
+  <p class="sous-titre">Connexions, consultations de fiches, imports, exports et modifications de dossiers : tout accès aux données
+    personnelles laisse une trace, avec son auteur et sa date.</p></div>
+  <div class="actions">
+    <select class="champ" id="filtre-action"><option value="">Toutes les actions</option>
+      {% for k, v in libelles.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+    <input class="champ" id="filtre-identifiant" placeholder="Identifiant">
+  </div></header>
+<section class="carte"><div class="tableau-wrap"><table class="liste"><thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Objet</th><th>Détail</th><th>Adresse</th></tr></thead>
+  <tbody id="lignes"></tbody></table></div>
+  <div class="pagination"><span id="page-info"></span><span class="actions"><button class="btn btn-petit" id="prec">Plus récents</button><button class="btn btn-petit" id="suiv">Plus anciens</button></span></div></section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const { echapper, api, dateHeure } = Commun;
+  let page = 0;
+  async function charger() {
+    const p = new URLSearchParams({ page });
+    const a = document.getElementById('filtre-action').value, i = document.getElementById('filtre-identifiant').value.trim();
+    if (a) p.set('action', a); if (i) p.set('identifiant', i);
+    const d = await api('/api/admin/journal?' + p);
+    document.getElementById('lignes').innerHTML = d.lignes.map((l) => `<tr style="cursor:default"><td class="petit">${dateHeure(l.cree_le)}</td>
+      <td>${echapper(l.identifiant || '–')}</td><td>${echapper(l.libelle)}</td><td class="petit">${l.objet ? echapper(l.objet) + (l.objet_id ? ' n° ' + l.objet_id : '') : ''}</td>
+      <td class="petit discret" style="max-width:360px;overflow-wrap:anywhere">${echapper(l.detail || '')}</td><td class="petit discret">${echapper(l.adresse || '')}</td></tr>`).join('')
+      || '<tr><td colspan="6" class="discret">Aucune entrée.</td></tr>';
+    document.getElementById('page-info').textContent = 'Page ' + (page + 1);
+    document.getElementById('prec').disabled = page === 0;
+    document.getElementById('suiv').disabled = !d.suivante;
+  }
+  document.getElementById('prec').addEventListener('click', () => { page -= 1; charger(); });
+  document.getElementById('suiv').addEventListener('click', () => { page += 1; charger(); });
+  document.getElementById('filtre-action').addEventListener('change', () => { page = 0; charger(); });
+  document.getElementById('filtre-identifiant').addEventListener('change', () => { page = 0; charger(); });
+  charger();
+})();
+</script>
+{% endblock %}

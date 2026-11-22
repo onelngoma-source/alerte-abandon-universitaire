@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf" content="{{ csrf }}">
 <title>{% block titre %}Alerte précoce{% endblock %}</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230D3863'/%3E%3Cpath d='M8 21l5-6 4 4 7-9' stroke='%23F7FFBD' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
@@ -10,34 +11,64 @@
 <body>
 <div class="coque">
   <nav class="barre-laterale" aria-label="Navigation principale">
-    <a class="marque" href="{{ url_for('tableau.page') }}">
+    <a class="marque" href="{{ url_for('racine') }}">
       <span class="sceau"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-6 4 4 7-9" stroke="#fff" stroke-width="2.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <span><b>Alerte précoce</b><small>Risque d'abandon universitaire</small></span>
+      <span><b>Alerte précoce</b><small>Suivi du risque d'abandon</small></span>
     </a>
 
     <span class="nav-titre">Accompagner</span>
+    <a class="nav-lien" href="{{ url_for('dossiers.page') }}" {{ 'aria-current=page' | safe if actif == 'dossiers' }}>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6l2 3h8v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M9 13l2 2 4-4"/></svg>
+      <span class="mot">Dossiers<small>Alertes à traiter</small></span>{% if compteurs.mes_retards %}<span class="pastille-nav rouge" title="Mes dossiers en retard">{{ compteurs.mes_retards }}</span>{% elif compteurs.mes_dossiers %}<span class="pastille-nav" title="Mes dossiers ouverts">{{ compteurs.mes_dossiers }}</span>{% endif %}
+    </a>
     <a class="nav-lien" href="{{ url_for('tableau.page') }}" {{ 'aria-current=page' | safe if actif == 'tableau' }}>
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 20v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/></svg>
       <span class="mot">Suivi de cohorte<small>Qui accompagner en priorité</small></span>
     </a>
     <a class="nav-lien" href="{{ url_for('saisie.page') }}" {{ 'aria-current=page' | safe if actif == 'saisie' }}>
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.5 6.5 0 0 1 11.4-4.3"/><path d="M18 14v6"/><path d="M15 17h6"/></svg>
-      <span class="mot">Évaluer un étudiant<small>Saisie d'un dossier</small></span>
+      <span class="mot">Simuler un dossier<small>Estimation sans enregistrement</small></span>
+    </a>
+    {% if utilisateur and utilisateur.role in ('responsable', 'admin') %}
+    <span class="nav-titre">Piloter</span>
+    <a class="nav-lien" href="{{ url_for('pilotage.page') }}" {{ 'aria-current=page' | safe if actif == 'pilotage' }}>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M3 21h18"/></svg>
+      <span class="mot">Pilotage<small>Délais, charge, résultats</small></span>{% if compteurs.non_attribues %}<span class="pastille-nav or" title="Dossiers non attribués">{{ compteurs.non_attribues }}</span>{% endif %}
     </a>
     <a class="nav-lien" href="{{ url_for('import_csv.page') }}" {{ 'aria-current=page' | safe if actif == 'import' }}>
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
-      <span class="mot">Importer une cohorte<small>Fichier CSV</small></span>
+      <span class="mot">Importer<small>Promotion, résultats d'un semestre</small></span>
     </a>
-
+    {% endif %}
     <span class="nav-titre">Comprendre</span>
     <a class="nav-lien" href="{{ url_for('fiabilite.page') }}" {{ 'aria-current=page' | safe if actif == 'fiabilite' }}>
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
-      <span class="mot">Fiabilité du modèle<small>Résultats, limites, méthode</small></span>
+      <span class="mot">Fiabilité du modèle<small>Référence et surveillance</small></span>
     </a>
+    {% if utilisateur and utilisateur.role == 'admin' %}
+    <span class="nav-titre">Administrer</span>
+    <a class="nav-lien" href="{{ url_for('administration.page_utilisateurs') }}" {{ 'aria-current=page' | safe if actif == 'admin_utilisateurs' }}>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M19 8v6"/><path d="M16 11h6"/></svg>
+      <span class="mot">Comptes<small>Utilisateurs et rôles</small></span>
+    </a>
+    <a class="nav-lien" href="{{ url_for('administration.page_journal') }}" {{ 'aria-current=page' | safe if actif == 'admin_journal' }}>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+      <span class="mot">Journal<small>Qui a fait quoi</small></span>
+    </a>
+    <a class="nav-lien" href="{{ url_for('administration.page_donnees') }}" {{ 'aria-current=page' | safe if actif == 'admin_donnees' }}>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+      <span class="mot">Données<small>Conservation, purge</small></span>
+    </a>
+    {% endif %}
 
     <div class="barre-pied">
-      <div class="seuil-rappel">Un étudiant est <b>en alerte</b> dès que son risque d'abandon atteint <b>1 sur 6</b> (16,7 %).
-        <b>Élevé</b> à partir de 50 %.</div>
+      {% if mode_demo %}<div class="seuil-rappel"><b>Démonstration</b> : données et comptes fictifs, aucune opération destructrice.</div>{% endif %}
+      {% if utilisateur %}
+      <a class="nav-lien utilisateur-nav" href="{{ url_for('auth.compte') }}" {{ 'aria-current=page' | safe if actif == 'compte' }}>
+        <span class="avatar" aria-hidden="true">{{ utilisateur.nom[:1] }}</span>
+        <span class="mot">{{ utilisateur.nom }}<small>{{ roles[utilisateur.role] }}</small></span>
+      </a>
+      {% endif %}
       <a class="nav-lien" href="{{ url_for('auth.deconnexion') }}">
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M18 15l3-3-3-3"/><path d="M21 12H9"/></svg>
         <span class="mot">Se déconnecter</span>

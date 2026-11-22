@@ -1,4 +1,4 @@
-"""Construction d'une cohorte a partir d'un tableau d'etudiants (fichier CSV ou jeu de test).
+"""Lecture d'un fichier d'etudiants et enregistrement dans une promotion (fichier CSV ou jeu de test).
 
 Une SEULE fonction, `importer`, sert au chargement du jeu de test et a l'import d'un fichier :
 c'est la garantie que les deux volets produisent exactement le meme tableau.
@@ -6,20 +6,20 @@ c'est la garantie que les deux volets produisent exactement le meme tableau.
 from __future__ import annotations
 
 import io
-import json
 
 import pandas as pd
 
 import db
-from .referentiels import CHAMPS_FORMULAIRE, FILIERES
+from .referentiels import CHAMPS_FORMULAIRE
 from .scoring import Moteur
 
 NOMS_REFERENCE = {"reference", "référence", "ref", "id", "identifiant", "matricule", "student id", "id etudiant"}
 NOMS_DEVENIR = {"target", "devenir", "devenir reel", "devenir réel"}
 NOMS_ABANDON = {"abandon", "dropout"}
-_DEVENIRS_TEXTE = {"dropout": "Dropout", "abandon": "Dropout", "graduate": "Graduate", "diplome": "Graduate",
-                   "diplômé": "Graduate", "enrolled": "Enrolled", "inscrit": "Enrolled"}
-EN_TETES_GABARIT = ["Reference"] + CHAMPS_FORMULAIRE + ["Target"]
+NOMS_NOM = {"nom", "nom complet", "nom et prenom", "nom et prénom", "prenom et nom", "prénom et nom", "name", "full name"}
+NOMS_EMAIL = {"email", "e-mail", "courriel", "mail", "adresse email"}
+NOMS_TELEPHONE = {"telephone", "téléphone", "tel", "tél", "phone", "portable"}
+EN_TETES_GABARIT = ["Reference", "Nom", "Email", "Telephone"] + CHAMPS_FORMULAIRE + ["Target"]
 TAILLE_MAX_LIGNES_IGNOREES = 20
 
 
@@ -53,13 +53,17 @@ def appliquer_correspondance(df: pd.DataFrame, correspondance: dict | None, mote
     for champ, colonne in correspondance.items():
         if not colonne or colonne == "__aucune__" or colonne not in df.columns:
             continue
-        cible = {"reference": "Reference", "devenir": "Target"}.get(champ)
+        cible = {"reference": "Reference", "devenir": "Target", "nom": "Nom", "email": "Email",
+                 "telephone": "Telephone"}.get(champ)
         renommage[colonne] = cible or moteur.noms_canoniques.get(moteur.normaliser(champ), champ)
     cibles = set(renommage.values())
     a_supprimer = [c for c in df.columns if c not in renommage and
                    (moteur.noms_canoniques.get(moteur.normaliser(c)) in cibles
                     or (("Reference" in cibles) and moteur.normaliser(c) in NOMS_REFERENCE)
-                    or (("Target" in cibles) and moteur.normaliser(c) in NOMS_DEVENIR | NOMS_ABANDON))]
+                    or (("Target" in cibles) and moteur.normaliser(c) in NOMS_DEVENIR | NOMS_ABANDON)
+                    or (("Nom" in cibles) and moteur.normaliser(c) in NOMS_NOM)
+                    or (("Email" in cibles) and moteur.normaliser(c) in NOMS_EMAIL)
+                    or (("Telephone" in cibles) and moteur.normaliser(c) in NOMS_TELEPHONE))]
     return df.drop(columns=a_supprimer).rename(columns=renommage)
 
 
@@ -70,73 +74,38 @@ def _colonne(df: pd.DataFrame, noms: set[str], moteur: Moteur) -> str | None:
     return None
 
 
-def _entier_ou_none(valeur):
-    return None if pd.isna(valeur) else int(round(float(valeur)))
+def promotion_par_nom(c, nom: str, origine: str = "etablissement") -> int:
+    from sqlalchemy import select
+    r = db.ligne(c.execute(select(db.promotion.c.id).where(db.promotion.c.nom == nom)))
+    if r:
+        return r["id"]
+    return c.execute(db.promotion.insert().values(nom=nom, origine=origine, cree_le=db.maintenant())).inserted_primary_key[0]
 
 
-def _reel_ou_none(valeur):
-    return None if pd.isna(valeur) else round(float(valeur), 2)
-
-
-def importer(moteur: Moteur, df: pd.DataFrame, nom: str, origine: str, fichier: str | None,
-             proprietaire: str | None = None) -> dict:
-    """Score `df`, l'enregistre en base comme nouvelle cohorte et renvoie un compte rendu."""
-    df = df.reset_index(drop=True)
-    valeurs, erreurs = moteur.nettoyer(df)
-    valides = valeurs.drop(index=list(erreurs))
-    if valides.empty:
-        raise ValueError("Aucune ligne exploitable dans le fichier.")
-    scores = moteur.scorer_valeurs(valides)
-
-    col_ref = _colonne(df, NOMS_REFERENCE, moteur)
-    col_devenir = _colonne(df, NOMS_DEVENIR, moteur)
-    col_abandon = _colonne(df, NOMS_ABANDON, moteur)
-    col_filiere = _colonne(df, {moteur.normaliser("Course")}, moteur)
-
-    etudiants = []
-    for i in valides.index:
-        v, s = valides.loc[i], scores.loc[i]
-        reference = str(df.at[i, col_ref]).strip() if col_ref else ""
-        devenir, abandon = None, None
-        if col_devenir:
-            devenir = _DEVENIRS_TEXTE.get(moteur.normaliser(df.at[i, col_devenir]))
-        if devenir:
-            abandon = 1 if devenir == "Dropout" else 0
-        elif col_abandon:
-            texte = str(df.at[i, col_abandon]).strip().lower()
-            abandon = {"1": 1, "1.0": 1, "0": 0, "0.0": 0, "oui": 1, "non": 0}.get(texte)
-        course = _entier_ou_none(v["Course"])
-        texte_filiere = ""
-        if course is None and col_filiere:
-            texte_filiere = str(df.at[i, col_filiere]).strip()
-        genre = None if pd.isna(v["Gender"]) else ("Homme" if v["Gender"] == 1 else "Femme")
-        etudiants.append({
-            "reference": reference or f"L-{i + 1:04d}",
-            "filiere": (FILIERES.get(course, f"Code {course}") if course is not None else (texte_filiere or None)),
-            "genre": genre,
-            "age": _reel_ou_none(v["Age at enrollment"]),
-            "boursier": _entier_ou_none(v["Scholarship holder"]),
-            "debiteur": _entier_ou_none(v["Debtor"]),
-            "frais_a_jour": _entier_ou_none(v["Tuition fees up to date"]),
-            "note_s1": _reel_ou_none(v["Curricular units 1st sem (grade)"]),
-            "note_s2": _reel_ou_none(v["Curricular units 2nd sem (grade)"]),
-            "inscrites_s1": _entier_ou_none(v["Curricular units 1st sem (enrolled)"]),
-            "validees_s1": _entier_ou_none(v["Curricular units 1st sem (approved)"]),
-            "inscrites_s2": _entier_ou_none(v["Curricular units 2nd sem (enrolled)"]),
-            "validees_s2": _entier_ou_none(v["Curricular units 2nd sem (approved)"]),
-            "facteur": s["facteur"], "domaine_facteur": s["domaine_facteur"],
-            "devenir_reel": devenir, "abandon_reel": abandon,
-            "p_noyau": float(s["probabilite_noyau"]), "c_noyau": s["categorie_noyau"],
-            "p_ml": float(s["probabilite_ml"]), "c_ml": s["categorie_ml"],
-            "mode": s["mode_calcul"],
-            "caracteristiques": json.dumps({k: float(x) for k, x in v.items() if not pd.isna(x)}),
-        })
-    cohorte_id = db.creer_cohorte(nom, origine, fichier, etudiants, ignorees=len(erreurs),
-                                 proprietaire=proprietaire)
-    reconnues = [c for c in moteur.variables if moteur.normaliser(c) in {moteur.normaliser(x) for x in df.columns}]
+def importer(moteur: Moteur, df: pd.DataFrame, nom: str | None, origine: str, fichier: str | None,
+             promotion_id: int | None = None, utilisateur: dict | None = None) -> dict:
+    """Score `df` et l'enregistre dans une promotion (existante : mise a jour des etudiants deja connus,
+    par matricule ; sinon creee sous le nom donne). Rend le compte rendu de l'import."""
+    from metier.evaluations import enregistrer_lot
+    from metier.journal import tracer
+    colonnes = {
+        "reference": _colonne(df, NOMS_REFERENCE, moteur), "devenir": _colonne(df, NOMS_DEVENIR, moteur),
+        "abandon": _colonne(df, NOMS_ABANDON, moteur), "filiere": _colonne(df, {moteur.normaliser("Course")}, moteur),
+        "nom": _colonne(df, NOMS_NOM, moteur), "email": _colonne(df, NOMS_EMAIL, moteur),
+        "telephone": _colonne(df, NOMS_TELEPHONE, moteur),
+    }
+    with db.connexion() as c:
+        if promotion_id is None:
+            promotion_id = promotion_par_nom(c, nom, origine)
+        compte = enregistrer_lot(c, moteur, promotion_id, df, colonnes, fichier, utilisateur["id"] if utilisateur else None)
+        if utilisateur:
+            tracer(c, utilisateur, "import", "promotion", promotion_id,
+                   {"fichier": fichier, "effectif": compte["effectif"], "nouveaux": compte["nouveaux"],
+                    "dossiers_ouverts": compte["dossiers_ouverts"]})
+    erreurs, scores = compte.pop("erreurs"), compte.pop("scores")
+    reconnues = [v for v in moteur.variables if moteur.normaliser(v) in {moteur.normaliser(x) for x in df.columns}]
     return {
-        "cohorte_id": cohorte_id,
-        "effectif": len(etudiants),
+        **compte,
         "lignes_ignorees": [{"ligne": int(i) + 2, "motif": m} for i, m in list(erreurs.items())[:TAILLE_MAX_LIGNES_IGNOREES]],
         "nb_ignorees": len(erreurs),
         "variables_reconnues": len(reconnues),

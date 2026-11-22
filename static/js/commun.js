@@ -39,6 +39,49 @@
     masquer() { const v = document.querySelector('[data-role="voile"]'); if (v) v.dataset.visible = '0'; },
   };
 
-  window.Commun = { SEUIL_ALERTE, SEUIL_ELEVE, echapper, nombre, pct, dec, niveau, enAlerte, badge, jauge, NIVEAUX, MOMENTS, MOMENTS_COURTS };
+  /* Jeton anti-CSRF : ajoute a toute requete qui modifie quelque chose sur le serveur de l'application. */
+  const jeton = (document.querySelector('meta[name="csrf"]') || {}).content;
+  const fetchOrigine = window.fetch.bind(window);
+  window.fetch = (url, options = {}) => {
+    const methode = (options.method || 'GET').toUpperCase();
+    if (jeton && methode !== 'GET' && String(url).startsWith('/')) {
+      options.headers = Object.assign({}, options.headers, { 'X-CSRF-Token': jeton });
+    }
+    return fetchOrigine(url, options);
+  };
+
+  /* Appel JSON : rend les donnees, ou leve une erreur portant le message du serveur. */
+  async function api(url, corps, methode) {
+    const options = corps === undefined ? { method: methode || 'GET' }
+      : { method: methode || 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) };
+    const res = await fetch(url, options);
+    const json = await res.json().catch(() => ({}));
+    if (res.status === 401) { location.href = '/connexion?suivant=' + encodeURIComponent(location.pathname + location.search); }
+    if (!res.ok) throw new Error(json.erreur || 'Erreur du serveur');
+    return json;
+  }
+
+  const date = (iso) => iso ? new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '–';
+  const dateHeure = (iso) => iso ? new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '–';
+  function relatif(iso) {
+    if (!iso) return '';
+    const jours = Math.round((new Date(iso.length === 10 ? iso + 'T12:00:00' : iso) - new Date()) / 86400000);
+    if (jours === 0) return "aujourd'hui";
+    if (jours === 1) return 'demain';
+    if (jours === -1) return 'hier';
+    return jours > 0 ? `dans ${jours} j` : `il y a ${-jours} j`;
+  }
+  const STATUTS = { a_contacter: 'À contacter', contacte: 'Contacté', entretien: 'Entretien réalisé', accompagnement: 'Accompagnement en cours', clos: 'Clos' };
+  const statut = (s) => s ? `<span class="statut s-${s}">${STATUTS[s]}</span>` : '<span class="discret">–</span>';
+
+  function notifier(message, type = 'ok') {
+    let zone = document.getElementById('notifications');
+    if (!zone) { zone = document.createElement('div'); zone.id = 'notifications'; zone.setAttribute('aria-live', 'polite'); document.body.appendChild(zone); }
+    const n = document.createElement('div'); n.className = 'notification ' + type; n.textContent = message;
+    zone.appendChild(n); setTimeout(() => n.remove(), 4200);
+  }
+
+  window.Commun = { SEUIL_ALERTE, SEUIL_ELEVE, echapper, nombre, pct, dec, niveau, enAlerte, badge, jauge, NIVEAUX, MOMENTS, MOMENTS_COURTS,
+    api, date, dateHeure, relatif, STATUTS, statut, notifier };
   window.Chargement = Chargement;
 })();

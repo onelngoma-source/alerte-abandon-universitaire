@@ -4,9 +4,10 @@
 <header class="entete-page">
   <div class="titres">
     <div class="sur-titre">Importer une cohorte</div>
-    <h1>Ajouter les étudiants d'un fichier</h1>
-    <p class="sous-titre">Un fichier CSV, une ligne par étudiant. Le risque de chacun est calculé avec le modèle du moment
-      atteint (inscription, 1er ou 2e semestre), puis la cohorte s'ouvre dans le suivi.</p>
+    <h1>Importer une promotion ou ses nouveaux résultats</h1>
+    <p class="sous-titre">Un fichier CSV, une ligne par étudiant. À la rentrée, créez la promotion ; à la fin de chaque semestre,
+      importez les résultats dans la même promotion : les étudiants sont retrouvés par leur matricule, leur risque est recalculé
+      et les dossiers de suivi s'ouvrent pour les nouvelles alertes.</p>
   </div>
   <div class="actions">
     <ol class="etapes-import" id="etapes">
@@ -26,7 +27,12 @@
     <div class="nom-fichier" id="nom-fichier" hidden></div>
   </div>
   <section class="carte"><div class="carte-corps actions" style="align-items:flex-end">
-    <div class="champ-bloc" style="flex:1 1 280px"><label for="nom">Nom de la cohorte <span class="discret">(facultatif)</span></label>
+    <div class="champ-bloc" style="flex:1 1 240px"><label for="promotion">Destination</label>
+      <select id="promotion" class="champ" style="width:100%">
+        <option value="">Nouvelle promotion</option>
+        {% for p in promotions %}<option value="{{ p.id }}" {{ 'selected' if p.id == cible }}>Mettre à jour : {{ p.nom }}</option>{% endfor %}
+      </select></div>
+    <div class="champ-bloc" style="flex:1 1 240px" id="bloc-nom"><label for="nom">Nom de la nouvelle promotion</label>
       <input type="text" id="nom" class="champ" style="width:100%" placeholder="ex. Licence 1, rentrée 2026"></div>
     <a class="btn" href="{{ url_for('import_csv.gabarit') }}">Gabarit vierge</a>
     <a class="btn" href="{{ url_for('import_csv.exemple') }}">Fichier d'exemple</a>
@@ -34,7 +40,7 @@
   </div>
   <div class="erreur-saisie" id="erreur" role="alert" hidden style="margin:0 20px 18px; white-space:pre-line"></div></section>
   <div class="trois">
-    <div class="carte"><div class="carte-corps"><b>Une ligne par étudiant</b><span class="discret petit">Une colonne de référence (matricule) permet de retrouver chacun dans le suivi.</span></div></div>
+    <div class="carte"><div class="carte-corps"><b>Le matricule est la clé</b><span class="discret petit">C'est lui qui relie les résultats d'un semestre à l'étudiant déjà connu. Nom, courriel et téléphone sont facultatifs.</span></div></div>
     <div class="carte"><div class="carte-corps"><b>Le moment se déduit du fichier</b><span class="discret petit">Sans notes de semestre : modèle de l'inscription. Avec le 1er semestre, puis le 2e : modèles correspondants.</span></div></div>
     <div class="carte"><div class="carte-corps"><b>Les en-têtes peuvent différer</b><span class="discret petit">Une étape d'association vous laisse désigner la colonne de chaque information. Les absentes sont complétées.</span></div></div>
   </div>
