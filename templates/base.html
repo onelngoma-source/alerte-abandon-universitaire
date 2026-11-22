@@ -9,6 +9,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
+<div class="fond-app" aria-hidden="true"><i class="halo halo-a"></i><i class="halo halo-b"></i><i class="halo halo-c"></i></div>
+<div class="grain" aria-hidden="true"></div>
 <div class="coque">
   <nav class="barre-laterale" aria-label="Navigation principale">
     <a class="marque" href="{{ url_for('racine') }}">
@@ -81,6 +83,21 @@
   </main>
 </div>
 
+<div class="voile-tiroir" id="voile-tiroir"></div>
+<aside class="tiroir" id="tiroir" role="dialog" aria-modal="true" aria-labelledby="tiroir-titre">
+  <div class="tiroir-tete">
+    <div style="flex:1;min-width:0"><h2 id="tiroir-titre">&nbsp;</h2><p class="discret" id="tiroir-sous-titre"></p></div>
+    <button class="btn btn-petit btn-icone" type="button" id="fermer-tiroir" aria-label="Fermer l'aperçu">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="tiroir-corps" id="tiroir-corps"></div>
+  <div class="tiroir-pied"><div class="tiroir-nav">
+    <button class="btn btn-icone" type="button" id="tiroir-prec" aria-label="Étudiant précédent de la liste" hidden>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg></button>
+    <button class="btn btn-icone" type="button" id="tiroir-suiv" aria-label="Étudiant suivant de la liste" hidden>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <span class="discret petit" id="tiroir-position"></span></div><a class="btn btn-plein" id="tiroir-fiche" href="#">Ouvrir la fiche complète</a></div>
+</aside>
 <div class="voile-chargement" data-role="voile" aria-live="polite">
   <div class="bloc"><span class="anneau" aria-hidden="true"></span><span data-role="texte-chargement">Calcul en cours</span></div>
 </div>

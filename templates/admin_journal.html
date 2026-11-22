@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Journal · Alerte précoce{% endblock %}
 {% block contenu %}
-<header class="entete-page"><div class="titres"><div class="sur-titre">Administration</div><h1>Journal d'activité</h1>
+<header class="entete-page"><div class="titres"><h1>Journal d'activité</h1>
   <p class="sous-titre">Connexions, consultations de fiches, imports, exports et modifications de dossiers : tout accès aux données
     personnelles laisse une trace, avec son auteur et sa date.</p></div>
   <div class="actions">
@@ -9,7 +9,7 @@
       {% for k, v in libelles.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
     <input class="champ" id="filtre-identifiant" placeholder="Identifiant">
   </div></header>
-<section class="carte"><div class="tableau-wrap"><table class="liste"><thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Objet</th><th>Détail</th><th>Adresse</th></tr></thead>
+<section class="carte feuille remplir"><div class="tableau-wrap"><table class="liste"><thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Objet</th><th>Détail</th><th>Adresse</th></tr></thead>
   <tbody id="lignes"></tbody></table></div>
   <div class="pagination"><span id="page-info"></span><span class="actions"><button class="btn btn-petit" id="prec">Plus récents</button><button class="btn btn-petit" id="suiv">Plus anciens</button></span></div></section>
 {% endblock %}

@@ -1,4 +1,7 @@
-"""Rendu reel dans un navigateur (Chromium) : le parcours d'un conseiller, de la file d'accompagnement a la fiche."""
+"""Rendu reel dans un navigateur (Chromium) : le parcours d'un conseiller, de la file d'accompagnement a la fiche.
+
+Les listes s'affichent par lots dans leur propre zone de defilement ; un clic ouvre l'apercu (tiroir de droite),
+d'ou l'on traite le dossier ou ouvre la fiche complete, organisee en onglets."""
 import threading
 from pathlib import Path
 
@@ -52,8 +55,11 @@ def test_demarrage_vide_puis_chargement_du_jeu_de_test(page):
     pg.goto(serveur + "/tableau")
     assert pg.is_visible("#etat-vide")
     charger(pg, serveur)
-    assert pg.inner_text("#kpi-effectif").replace("\u202f", " ") == "1 227"
-    assert pg.locator("#lignes tr").count() == 25
+    pg.wait_for_function("document.querySelector('#kpi-effectif').innerText.replace(/\\s/g, '') === '1227'")
+    assert pg.locator("#lignes tr[data-id]").count() == 60
+    # les lignes suivantes arrivent quand on approche du bas de la liste
+    pg.locator("#lignes .sentinelle").scroll_into_view_if_needed()
+    pg.wait_for_function("document.querySelectorAll('#lignes tr[data-id]').length > 60")
 
 
 def test_la_file_est_classee_par_risque_et_suit_la_capacite(page):
@@ -79,19 +85,35 @@ def test_filtres_par_niveau_et_par_filiere(page):
     assert {t.split(' · ')[0] for t in pg.locator("#lignes .etudiant span").all_inner_texts()} == {"Agronomie"}
 
 
-def test_un_clic_ouvre_la_fiche_et_permet_de_passer_au_suivant(page):
+def test_un_clic_ouvre_l_apercu_puis_la_fiche_en_onglets(page):
     pg, serveur, _ = page
     charger(pg, serveur)
     premier = pg.inner_text("#lignes tr:first-child .etudiant b")
+    deuxieme = pg.inner_text("#lignes tr:nth-child(2) .etudiant b")
     pg.click("#lignes tr:first-child")
-    pg.wait_for_selector(".risque-grand")
+    pg.wait_for_selector("#tiroir.ouvert #carte-dossier")
+    assert pg.inner_text("#tiroir-titre") == premier
+    assert pg.locator("#tiroir .facteurs.hausse li").count() >= 1
+    # fleche bas : etudiant suivant de la liste, sans quitter la page
+    pg.keyboard.press("ArrowDown")
+    pg.wait_for_function(f"document.querySelector('#tiroir-titre').innerText === {deuxieme!r}")
+    pg.keyboard.press("ArrowUp")
+    pg.wait_for_function(f"document.querySelector('#tiroir-titre').innerText === {premier!r}")
+    pg.click("#tiroir-fiche")
+    pg.wait_for_selector("#ruban-fiche")
     assert pg.inner_text("h1") == premier
-    assert pg.locator(".facteurs.hausse li").count() >= 1
-    assert pg.is_visible(".pistes") and pg.is_visible(".pastilles-voisins")
+    assert pg.is_visible("#p-suivi #carte-dossier")
+    pg.click("[data-onglet=pourquoi]")
+    assert pg.locator("#p-pourquoi .facteurs.hausse li").count() >= 1
+    assert pg.is_visible("#p-pourquoi .pistes")
+    pg.click("[data-onglet=proches]")
+    assert pg.is_visible(".pastilles-voisins")
+    pg.click("[data-onglet=evolution]")
     assert pg.locator(".trajectoire .etape-traj").count() == 3
     pg.click("#suivant")
-    pg.wait_for_selector(".risque-grand")
-    assert pg.inner_text("h1") != premier
+    pg.wait_for_function(f"document.querySelector('h1').innerText !== {premier!r}")
+    pg.wait_for_selector("#ruban-fiche")
+    assert pg.inner_text("h1") == deuxieme
 
 
 def test_la_saisie_estime_en_direct(page):
@@ -108,10 +130,14 @@ def test_la_saisie_estime_en_direct(page):
 def test_la_page_fiabilite_retrouve_l_evaluation(page):
     pg, serveur, _ = page
     pg.goto(serveur + "/fiabilite")
-    pg.wait_for_selector("#table-comparaison tr")
+    pg.wait_for_selector("#table-moments tbody tr")
     assert "0,902" in pg.inner_text("#kpis")
-    assert "Boursiers" in pg.inner_text("#table-equite")
     assert pg.locator("#table-moments tbody tr").count() == 3
+    pg.click("[data-onglet=calibration]")
+    pg.wait_for_selector("#table-equite tr")
+    assert "Boursiers" in pg.inner_text("#table-equite")
+    pg.click("[data-onglet=comparaison]")
+    pg.wait_for_selector("#table-comparaison tr")
 
 
 def test_les_pages_restent_sobres_sans_jargon(page):
@@ -119,8 +145,14 @@ def test_les_pages_restent_sobres_sans_jargon(page):
     pg, serveur, _ = page
     charger(pg, serveur)
     pg.click("#lignes tr:first-child")
-    pg.wait_for_selector(".risque-grand")
-    texte = pg.inner_text("main")
+    pg.wait_for_selector("#tiroir.ouvert #carte-dossier")
+    textes = [pg.inner_text("main"), pg.inner_text("#tiroir")]
+    pg.click("#tiroir-fiche")
+    pg.wait_for_selector("#ruban-fiche")
+    for onglet in ("suivi", "pourquoi", "evolution", "proches", "scolaire"):
+        pg.click(f"[data-onglet={onglet}]")
+        textes.append(pg.inner_text("main"))
+    texte = " ".join(textes)
     for mot in ("logit", "Curricular", "Tuition", "T0", "T1", "T2", "p_ml", "undefined", "NaN"):
         assert mot not in texte, mot
 
@@ -131,7 +163,8 @@ def test_traiter_une_alerte_depuis_les_dossiers(page):
     pg.goto(serveur + "/dossiers?vue=non_attribues")
     pg.wait_for_selector("#lignes tr")
     pg.click("#lignes tr:first-child td:nth-child(2)")
-    pg.wait_for_selector("#carte-dossier .statut.s-a_contacter")
+    # le dossier se traite dans l'apercu, sans quitter la liste
+    pg.wait_for_selector("#tiroir.ouvert #carte-dossier .statut.s-a_contacter")
     pg.click("[data-op=statut][data-statut=contacte]")
     pg.wait_for_selector("#carte-dossier .statut.s-contacte")
     pg.select_option("form[data-op=action] select[name=type]", "entretien")
@@ -141,8 +174,11 @@ def test_traiter_une_alerte_depuis_les_dossiers(page):
     pg.click("[data-op=ouvrir-cloture]")
     pg.select_option("form[data-op=cloture] select[name=motif]", "risque_ecarte")
     pg.click("form[data-op=cloture] button[type=submit]")
-    pg.wait_for_selector("text=Aucun dossier ouvert")
-    assert "Risque écarté" in pg.inner_text("#carte-dossier")
+    pg.wait_for_selector("#tiroir >> text=Aucun dossier ouvert")
+    assert "Risque écarté" in pg.inner_text("#tiroir #carte-dossier")
+    # la liste des dossiers non attribues s'est mise a jour derriere le tiroir
+    pg.keyboard.press("Escape")
+    assert not pg.is_visible("#tiroir.ouvert")
 
 
 def test_pages_de_pilotage_et_d_administration(page):

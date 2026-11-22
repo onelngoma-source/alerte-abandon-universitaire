@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titre %}Mon compte · Alerte précoce{% endblock %}
 {% block contenu %}
-<header class="entete-page"><div class="titres"><div class="sur-titre">Mon compte</div><h1>{{ utilisateur.nom }}</h1>
+<header class="entete-page"><div class="titres"><h1>{{ utilisateur.nom }}</h1>
   <p class="sous-titre">{{ roles[utilisateur.role] }} · identifiant « {{ utilisateur.identifiant }} »</p></div></header>
 {% if utilisateur.doit_changer_mdp %}
 <div class="encart or" style="margin-bottom:16px"><div><b>Choisissez votre mot de passe.</b> Le mot de passe provisoire qui vous a été remis

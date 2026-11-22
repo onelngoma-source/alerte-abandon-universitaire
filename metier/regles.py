@@ -9,7 +9,7 @@ STATUTS = {
     "a_contacter": "À contacter",
     "contacte": "Contacté",
     "entretien": "Entretien réalisé",
-    "accompagnement": "Accompagnement en cours",
+    "accompagnement": "En accompagnement",
     "clos": "Clos",
 }
 STATUTS_OUVERTS = ["a_contacter", "contacte", "entretien", "accompagnement"]

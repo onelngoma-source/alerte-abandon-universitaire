@@ -4,10 +4,9 @@
 {% set gestion = utilisateur.role in ('responsable', 'admin') %}
 <header class="entete-page">
   <div class="titres">
-    <div class="sur-titre">Dossiers d'accompagnement</div>
     <h1>{{ 'Mes alertes à traiter' if utilisateur.role == 'conseiller' else 'Alertes et suivi' }}</h1>
     <p class="sous-titre">Un dossier s'ouvre quand le risque d'un étudiant atteint 1 sur 6. Les retards et les risques en hausse
-      passent en tête ; chaque dossier a une échéance, fixée automatiquement à chaque étape.</p>
+      passent en tête. Cliquez sur un dossier pour le traiter sans quitter la liste.</p>
   </div>
   <div class="actions">
     <select class="champ" id="filtre-promotion" aria-label="Promotion"><option value="">Toutes les promotions</option>
@@ -18,37 +17,42 @@
   </div>
 </header>
 
-<nav class="onglets" aria-label="Vues">
-  {% for cle, libelle in vues.items() %}
-  <a href="?vue={{ cle }}" data-vue="{{ cle }}" {{ 'aria-current=page' | safe if cle == vue }}>{{ libelle }}<span class="compte" data-compte="{{ cle }}"></span></a>
-  {% endfor %}
-</nav>
+<div class="remplir" id="zone-dossiers" style="display:flex;flex-direction:column;gap:12px">
+  <nav class="onglets" role="tablist" aria-label="Vues">
+    {% for cle, libelle in vues.items() %}
+    <button role="tab" data-onglet="{{ cle }}" data-vue="{{ cle }}">{{ libelle }}<span class="compte" data-compte="{{ cle }}"></span></button>
+    {% endfor %}
+  </nav>
 
-<section class="carte">
-  {% if gestion %}
-  <div class="selection" id="barre-selection" hidden>
-    <b id="nb-selection">0</b> dossier(s) sélectionné(s) · attribuer à
-    <select class="champ" id="cible-attribution" style="height:32px">
-      {% for c in conseillers %}<option value="{{ c.id }}">{{ c.nom }}</option>{% endfor %}</select>
-    <button class="btn btn-petit btn-plein" type="button" id="attribuer-selection">Attribuer</button>
-  </div>
-  {% endif %}
-  <div class="tableau-wrap">
-    <table class="liste">
-      <thead><tr>
-        {% if gestion %}<th style="width:34px"><input type="checkbox" id="tout" aria-label="Tout sélectionner"></th>{% endif %}
-        <th>Étudiant</th><th>Risque</th><th>Ce qui pèse le plus</th><th>Statut</th><th>Conseiller</th><th id="th-date">Échéance</th>
-      </tr></thead>
-      <tbody id="lignes"></tbody>
-    </table>
-  </div>
-  <div class="vide-liste" id="aucun" hidden></div>
-  <div class="pagination"><span id="compte">&nbsp;</span>
-    <span class="actions"><button class="btn btn-petit" id="page-prec" type="button">Précédent</button><span id="page-num" class="tnum"></span><button class="btn btn-petit" id="page-suiv" type="button">Suivant</button></span></div>
-</section>
+  <section class="carte feuille remplir">
+    {% if gestion %}
+    <div class="selection" id="barre-selection" hidden>
+      <b id="nb-selection">0</b> dossier(s) sélectionné(s), à attribuer à
+      <select class="champ" id="cible-attribution" style="height:32px">
+        {% for c in conseillers %}<option value="{{ c.id }}">{{ c.nom }}</option>{% endfor %}</select>
+      <button class="btn btn-petit btn-plein" type="button" id="attribuer-selection">Attribuer</button>
+    </div>
+    {% endif %}
+    <div class="tableau-wrap">
+      <table class="liste">
+        <thead><tr>
+          {% if gestion %}<th class="col-selection" style="width:34px"><input type="checkbox" id="tout" aria-label="Tout sélectionner"></th>{% endif %}
+          <th>Étudiant</th><th>Risque</th><th class="col-large">Ce qui pèse le plus</th><th>Statut</th><th class="col-large">Conseiller</th><th id="th-date">Échéance</th>
+        </tr></thead>
+        <tbody id="lignes"></tbody>
+      </table>
+      <div class="vide-liste" id="aucun" hidden></div>
+    </div>
+    <div class="pied-liste"><span id="compte">&nbsp;</span><span>Clic : traiter dans l'aperçu · ↑ ↓ pour passer au suivant</span></div>
+  </section>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script>window.VUE = {{ vue | tojson }}; window.GESTION = {{ 'true' if gestion else 'false' }};</script>
+<script>window.VUE = {{ vue | tojson }}; window.GESTION = {{ 'true' if utilisateur.role in ('responsable', 'admin') else 'false' }};</script>
+<script>window.UTILISATEUR_ID = {{ utilisateur.id }};</script>
+<script src="{{ url_for('static', filename='js/fiche.js') }}"></script>
+<script src="{{ url_for('static', filename='js/suivi.js') }}"></script>
+<script src="{{ url_for('static', filename='js/apercu.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dossiers.js') }}"></script>
 {% endblock %}

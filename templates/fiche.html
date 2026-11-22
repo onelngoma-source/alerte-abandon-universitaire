@@ -1,25 +1,40 @@
 {% extends "base.html" %}
 {% block titre %}{{ nom or reference }} · Alerte précoce{% endblock %}
 {% block contenu %}
-<a class="fil-ariane" href="#" id="retour">
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-  <span id="retour-texte">Suivi de cohorte · {{ cohorte.nom }}</span></a>
 <header class="entete-page">
   <div class="titres">
-    <div class="sur-titre">Fiche étudiant</div>
-    <h1>{{ nom or reference }}</h1>
-    <p class="sous-titre" id="identite">&nbsp;</p>
+    <a class="fil-ariane" href="#" id="retour">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      <span id="retour-texte">{{ cohorte.nom }}</span></a>
+    <h1 style="margin-top:6px">{{ nom or reference }}</h1>
+    <div class="puces" id="identite"></div>
   </div>
   <div class="actions">
-    <a class="btn" id="precedent" hidden>
+    <a class="btn" id="precedent" hidden aria-label="Étudiant précédent dans la file">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Précédent</a>
-    <a class="btn" id="suivant" hidden>Suivant
+    <a class="btn" id="suivant" hidden aria-label="Étudiant suivant dans la file">Suivant
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></a>
   </div>
 </header>
-<div id="suivi" style="margin-bottom:16px"></div>
-<div id="fiche"><div class="carte etat-vide"><span class="anneau" style="display:inline-block"></span></div></div>
-<div id="historique" style="margin-top:16px"></div>
+
+<div id="ruban"><div class="carte squelette" style="height:96px"></div></div>
+
+<div class="remplir" id="zone-fiche" style="display:flex;flex-direction:column;gap:12px">
+  <nav class="onglets" role="tablist" aria-label="Sections de la fiche">
+    <button role="tab" data-onglet="suivi" aria-controls="p-suivi">Suivi</button>
+    <button role="tab" data-onglet="pourquoi" aria-controls="p-pourquoi">Pourquoi ce risque</button>
+    <button role="tab" data-onglet="evolution" aria-controls="p-evolution">Évolution</button>
+    <button role="tab" data-onglet="proches" aria-controls="p-proches">Profils proches</button>
+    <button role="tab" data-onglet="scolaire" aria-controls="p-scolaire">Dossier scolaire</button>
+  </nav>
+  <div class="panneaux remplir">
+    <div class="panneau" role="tabpanel" id="p-suivi" data-panneau="suivi"></div>
+    <div class="panneau" role="tabpanel" id="p-pourquoi" data-panneau="pourquoi" hidden></div>
+    <div class="panneau" role="tabpanel" id="p-evolution" data-panneau="evolution" hidden></div>
+    <div class="panneau" role="tabpanel" id="p-proches" data-panneau="proches" hidden></div>
+    <div class="panneau" role="tabpanel" id="p-scolaire" data-panneau="scolaire" hidden></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -30,23 +45,56 @@
 (function () {
   const id = {{ etudiant_id }};
   const cohorte = {{ cohorte.id }};
+  const { echapper } = Commun;
   const retour = document.getElementById('retour');
   const depuisDossiers = document.referrer.includes('/dossiers');
   retour.href = depuisDossiers ? document.referrer : '/tableau?cohorte=' + cohorte;
   if (depuisDossiers) document.getElementById('retour-texte').textContent = 'Dossiers';
 
+  let onglets = null;
+  const $ = (x) => document.getElementById(x);
+
+  function pourquoi(d) {
+    const r = d.resultat;
+    const avert = (d.avertissements || []).map((a) => `<div class="encart or">${Fiche.svg('<path d="M12 3l10 18H2z"/><path d="M12 10v4"/><path d="M12 17h.01"/>', 18)}<div>${echapper(a)}</div></div>`).join('');
+    return `${avert}<div class="grille-fit remplir" style="grid-template-columns:repeat(3, minmax(0,1fr))">
+      <section class="carte"><div class="carte-tete"><h2><span class="point eleve"></span> Ce qui augmente le risque</h2></div>
+        <div class="carte-corps">${Fiche.listeFacteurs(r.facteurs_hausse || [], 'hausse')}</div></section>
+      <section class="carte"><div class="carte-tete"><h2><span class="point faible"></span> Ce qui le réduit</h2></div>
+        <div class="carte-corps">${Fiche.listeFacteurs(r.facteurs_baisse || [], 'baisse')}</div></section>
+      ${Fiche.cartePistes(d.conseils || [], '')}
+    </div>
+    <p class="petit" style="color:rgba(255,255,255,.6)">Comparé à un étudiant moyen des cohortes 2008 à 2014. Les « leviers d'action » sont les facteurs sur lesquels l'accompagnement peut agir.</p>`;
+  }
+
+  function devenir(d) {
+    if (!d.devenir) return '';
+    const alerte = Commun.enAlerte(d.resultat.probabilite_ml);
+    const juste = alerte === (d.abandon_reel === 1);
+    return `<div class="ligne"><span class="discret">Devenir réel</span><b>${echapper(d.devenir)}</b>
+      <span class="etiquette ${juste ? '' : 'attention'}">${juste ? 'conforme à l\'estimation' : 'différent de l\'estimation'}</span></div>`;
+  }
+
   async function charger() {
     const res = await fetch('/api/etudiants/' + id);
     const d = await res.json();
-    const cible = document.getElementById('fiche');
-    if (!res.ok) { cible.innerHTML = `<div class="erreur-saisie">${Commun.echapper(d.erreur || 'Erreur')}</div>`; return; }
-    const filiere = (d.profil.find((p) => p.champ === 'Course') || {}).valeur;
-    const age = (d.profil.find((p) => p.champ === 'Age at enrollment') || {}).valeur;
-    const morceaux = [d.nom ? d.reference : null, filiere, age ? age + " ans à l'inscription" : null, d.cohorte,
-      d.email, d.telephone, d.referent ? 'Référent : ' + d.referent.nom : null];
-    document.getElementById('identite').textContent = morceaux.filter(Boolean).join(' · ');
-    Fiche.rendre(cible, d);
-    Suivi.rendre(document.getElementById('suivi'), d, charger);
+    if (!res.ok) { $('ruban').innerHTML = `<div class="erreur-saisie">${echapper(d.erreur || 'Erreur')}</div>`; return; }
+    const profil = (c) => (d.profil.find((p) => p.champ === c) || {}).valeur;
+    const puces = [d.nom ? d.reference : null, profil('Course'), profil('Age at enrollment') ? profil('Age at enrollment') + " ans à l'inscription" : null,
+      d.cohorte, d.email, d.telephone].filter(Boolean);
+    $('identite').innerHTML = puces.map((x) => `<span class="puce">${echapper(x)}</span>`).join('');
+    $('ruban').innerHTML = Fiche.ruban(d);
+    $('ruban').querySelector('.info-ruban:last-child').insertAdjacentHTML('beforeend', devenir(d));
+    const chiffre = $('ruban').querySelector('.chiffre');
+    Commun.compter(chiffre.firstChild, 100 * d.resultat.probabilite_ml, (v) => v.toLocaleString('fr-FR', { maximumFractionDigits: 1 }));
+
+    $('p-suivi').innerHTML = Suivi.panneauDossier(d);
+    $('p-pourquoi').innerHTML = pourquoi(d);
+    $('p-evolution').innerHTML = Suivi.panneauEvolution(d);
+    $('p-proches').innerHTML = `<div class="grille-fit remplir" style="grid-template-columns:minmax(0,1fr)">${Fiche.carteVoisins(d.resultat, '', true)}</div>`;
+    $('p-scolaire').innerHTML = Suivi.panneauScolaire(d);
+    Suivi.brancher($('zone-fiche'), d, charger);
+    if (!onglets) onglets = Commun.onglets($('zone-fiche'), { memoire: 'onglet-fiche' });
   }
   charger();
 
@@ -54,8 +102,8 @@
     const file = JSON.parse(sessionStorage.getItem('file-' + cohorte) || '[]');
     const i = file.indexOf(id);
     if (i >= 0) {
-      if (i > 0) { const a = document.getElementById('precedent'); a.href = '/etudiants/' + file[i - 1]; a.hidden = false; }
-      if (i < file.length - 1) { const a = document.getElementById('suivant'); a.href = '/etudiants/' + file[i + 1]; a.hidden = false; }
+      if (i > 0) { const a = $('precedent'); a.href = '/etudiants/' + file[i - 1]; a.hidden = false; }
+      if (i < file.length - 1) { const a = $('suivant'); a.href = '/etudiants/' + file[i + 1]; a.hidden = false; }
     }
   } catch (e) { /* stockage indisponible */ }
 })();

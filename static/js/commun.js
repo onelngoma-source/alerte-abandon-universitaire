@@ -71,17 +71,104 @@
     if (jours === -1) return 'hier';
     return jours > 0 ? `dans ${jours} j` : `il y a ${-jours} j`;
   }
-  const STATUTS = { a_contacter: 'À contacter', contacte: 'Contacté', entretien: 'Entretien réalisé', accompagnement: 'Accompagnement en cours', clos: 'Clos' };
+  const STATUTS = { a_contacter: 'À contacter', contacte: 'Contacté', entretien: 'Entretien réalisé', accompagnement: 'En accompagnement', clos: 'Clos' };
   const statut = (s) => s ? `<span class="statut s-${s}">${STATUTS[s]}</span>` : '<span class="discret">–</span>';
 
   function notifier(message, type = 'ok') {
     let zone = document.getElementById('notifications');
     if (!zone) { zone = document.createElement('div'); zone.id = 'notifications'; zone.setAttribute('aria-live', 'polite'); document.body.appendChild(zone); }
     const n = document.createElement('div'); n.className = 'notification ' + type; n.textContent = message;
-    zone.appendChild(n); setTimeout(() => n.remove(), 4200);
+    zone.appendChild(n);
+    setTimeout(() => { n.classList.add('sortie'); setTimeout(() => n.remove(), 320); }, 3800);
   }
 
+  const calme = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Les chiffres montent jusqu'a leur valeur : une seule fois, a l'affichage. */
+  function compter(el, valeur, format = nombre, duree = 900) {
+    if (!el) return;
+    if (calme()) { el.textContent = format(valeur); return; }
+    const debut = performance.now();
+    const pas = (t) => {
+      const x = Math.min(1, (t - debut) / duree);
+      const v = valeur * (1 - Math.pow(1 - x, 3));
+      el.textContent = format(Number.isInteger(valeur) && x < 1 ? Math.round(v) : (x < 1 ? v : valeur));
+      if (x < 1) requestAnimationFrame(pas);
+    };
+    requestAnimationFrame(pas);
+  }
+
+  /* Onglets : un curseur blanc glisse sous l'onglet choisi, le panneau entre en douceur.
+     Structure : .onglets [role=tab][data-onglet=x] et [data-panneau=x]. */
+  function onglets(racine, options = {}) {
+    const barre = racine.querySelector('.onglets');
+    const tabs = [...barre.querySelectorAll('[role="tab"]')];
+    let curseur = barre.querySelector('.curseur-onglet');
+    if (!curseur) { curseur = document.createElement('span'); curseur.className = 'curseur-onglet'; barre.prepend(curseur); }
+    barre.classList.add('anime');
+    const placer = (tab) => {
+      curseur.style.width = tab.offsetWidth + 'px';
+      curseur.style.transform = `translateX(${tab.offsetLeft - 4}px)`;
+      curseur.style.left = '4px';
+    };
+    function choisir(nom, focus = false) {
+      const tab = tabs.find((t) => t.dataset.onglet === nom) || tabs[0];
+      tabs.forEach((t) => { const oui = t === tab; t.setAttribute('aria-selected', String(oui)); t.tabIndex = oui ? 0 : -1; });
+      racine.querySelectorAll('[data-panneau]').forEach((p) => {
+        const oui = p.dataset.panneau === tab.dataset.onglet;
+        if (oui && p.hidden) { p.hidden = false; p.classList.remove('entre'); void p.offsetWidth; p.classList.add('entre'); }
+        else p.hidden = !oui;
+      });
+      placer(tab);
+      if (focus) tab.focus();
+      if (options.memoire) { try { sessionStorage.setItem(options.memoire, tab.dataset.onglet); } catch (e) { /* rien */ } }
+      if (options.surChangement) options.surChangement(tab.dataset.onglet);
+    }
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => choisir(t.dataset.onglet));
+      t.addEventListener('keydown', (e) => {
+        const k = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+        if (k) { e.preventDefault(); choisir(tabs[(i + k + tabs.length) % tabs.length].dataset.onglet, true); }
+      });
+    });
+    const replacer = () => { const t = tabs.find((x) => x.getAttribute('aria-selected') === 'true'); if (t) placer(t); };
+    window.addEventListener('resize', replacer);
+    if (window.ResizeObserver) { const ro = new ResizeObserver(replacer); tabs.forEach((t) => ro.observe(t)); }
+    let depart = options.initial;
+    if (!depart && options.memoire) { try { depart = sessionStorage.getItem(options.memoire); } catch (e) { /* rien */ } }
+    choisir(depart || tabs[0].dataset.onglet);
+    return { choisir };
+  }
+
+  /* Tiroir d'apercu, a droite : ouvert depuis une liste, ferme avec Echap ou un clic a cote. */
+  const Tiroir = {
+    ouvrir(titre, sousTitre) {
+      const t = document.getElementById('tiroir'); if (!t) return null;
+      document.getElementById('tiroir-titre').textContent = titre || '';
+      document.getElementById('tiroir-sous-titre').textContent = sousTitre || '';
+      t.classList.add('ouvert'); document.getElementById('voile-tiroir').classList.add('ouvert');
+      this.precedent = document.activeElement;
+      setTimeout(() => document.getElementById('fermer-tiroir').focus({ preventScroll: true }), 60);
+      return document.getElementById('tiroir-corps');
+    },
+    fermer() {
+      const t = document.getElementById('tiroir'); if (!t || !t.classList.contains('ouvert')) return;
+      t.classList.remove('ouvert'); document.getElementById('voile-tiroir').classList.remove('ouvert');
+      if (this.precedent && this.precedent.focus) this.precedent.focus({ preventScroll: true });
+      if (this.surFermeture) this.surFermeture();
+    },
+    estOuvert() { const t = document.getElementById('tiroir'); return Boolean(t && t.classList.contains('ouvert')); },
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    const f = document.getElementById('fermer-tiroir');
+    if (f) f.addEventListener('click', () => Tiroir.fermer());
+    const v = document.getElementById('voile-tiroir');
+    if (v) v.addEventListener('click', () => Tiroir.fermer());
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') Tiroir.fermer(); });
+
   window.Commun = { SEUIL_ALERTE, SEUIL_ELEVE, echapper, nombre, pct, dec, niveau, enAlerte, badge, jauge, NIVEAUX, MOMENTS, MOMENTS_COURTS,
-    api, date, dateHeure, relatif, STATUTS, statut, notifier };
+    api, date, dateHeure, relatif, STATUTS, statut, notifier, compter, onglets, calme };
+  window.Tiroir = Tiroir;
   window.Chargement = Chargement;
 })();

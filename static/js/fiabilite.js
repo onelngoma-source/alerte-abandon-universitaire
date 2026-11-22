@@ -27,9 +27,11 @@
   const axe = (titre, max = 1) => ({ min: 0, max, title: { display: true, text: titre, color: '#5A6A79' }, grid: { color: '#EEF1F5' },
     ticks: { color: '#5A6A79', callback: (v) => Math.round(v * 100) + ' %' } });
   Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  Chart.defaults.animation.duration = Commun.calme() ? 0 : 900;
   const parts = d.courbe_capacite.parts;
   const serie = (m, couleur) => ({ label: MOMENTS[m], data: parts.map((x, i) => ({ x, y: d.courbe_capacite[m][i] })), borderColor: couleur, backgroundColor: couleur, borderWidth: 2.5, pointRadius: 0, tension: 0.25 });
-  new Chart($('graphique-capacite'), {
+  const graphiques = {};
+  graphiques.capacite = () => new Chart($('graphique-capacite'), {
     type: 'line',
     data: { datasets: [serie('T2', '#0D3863'), serie('T1', '#3281E0'), serie('T0', '#D8B85C'),
       { label: 'Au hasard', data: [{ x: 0, y: 0 }, { x: 1, y: 1 }], borderColor: '#CED6DF', borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0 }] },
@@ -39,7 +41,7 @@
   });
 
   const points = (liste) => liste.map((b) => ({ x: b.predit, y: b.observe, n: b.effectif }));
-  new Chart($('graphique-calibration'), {
+  graphiques.calibration = () => new Chart($('graphique-calibration'), {
     type: 'scatter',
     data: { datasets: [
       { label: 'Régression logistique', data: points(d.calibration.logistique), backgroundColor: '#0D3863', pointRadius: 5.5, showLine: true, borderColor: '#0D3863', borderWidth: 1.5 },
@@ -78,4 +80,13 @@
   $('signaux-surveillance').innerHTML = (demo ? '<div class="encart">Démonstration : faute de devenirs connus dans l\'établissement, le tableau montre le calcul sur la promotion de démonstration.</div>' : '')
     + (signaux.length ? signaux.map((x) => `<div class="encart rouge"><div>${x}</div></div>`).join('')
       : etat.moments.some((m) => m.suffisant) ? '<div class="encart"><div>Aucun écart notable avec la référence.</div></div>' : '');
+
+  // les graphiques sont dessines quand leur onglet s'ouvre pour la premiere fois (un canevas cache n'a pas de taille)
+  const dessines = {};
+  Commun.onglets($('zone-fiabilite'), {
+    memoire: 'onglet-fiabilite',
+    surChangement: (nom) => {
+      if (graphiques[nom] && !dessines[nom]) { dessines[nom] = true; requestAnimationFrame(() => graphiques[nom]()); }
+    },
+  });
 })();

@@ -5,23 +5,22 @@
 {% set gestion = utilisateur.role in ('responsable', 'admin') %}
 <header class="entete-page">
   <div class="titres">
-    <div class="sur-titre">Suivi de cohorte</div>
     <h1>Qui accompagner en priorité&nbsp;?</h1>
-    <p class="sous-titre">Les étudiants sont classés du risque d'abandon le plus élevé au plus faible. Indiquez combien vous pouvez
-      en accompagner : la liste montre qui suivre d'abord, et pourquoi.</p>
+    <p class="sous-titre">Les étudiants sont classés du risque d'abandon le plus élevé au plus faible. Réglez la capacité de l'équipe :
+      la ligne dorée marque la fin de la file d'accompagnement. Cliquez sur un étudiant pour l'aperçu.</p>
   </div>
   {% if cohortes %}
   <div class="actions">
-    <label class="visuellement-cache" for="choix-cohorte">Cohorte affichée</label>
+    <label class="visuellement-cache" for="choix-cohorte">Promotion affichée</label>
     <select id="choix-cohorte" class="champ" style="min-width:250px">
       {% for c in cohortes %}<option value="{{ c.id }}" {{ 'selected' if c.id == courante }}>{{ c.nom }} · {{ '{:,}'.format(c.effectif).replace(',', ' ') }} étudiants</option>{% endfor %}
     </select>
     <a class="btn" id="btn-export" href="#">Exporter la file</a>
     {% if gestion %}<a class="btn" id="btn-importer" href="{{ url_for('import_csv.page') }}">Mettre à jour</a>{% endif %}
     {% if gestion and not a_jeu_de_test %}<button class="btn" type="button" id="btn-charger-test">Charger le jeu de test</button>{% endif %}
-    {% if utilisateur.role == 'admin' %}<button class="btn btn-danger" type="button" id="btn-supprimer" title="Supprimer cette promotion">
+    {% if utilisateur.role == 'admin' %}<button class="btn btn-danger btn-icone" type="button" id="btn-supprimer" title="Supprimer cette promotion">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
-      <span class="visuellement-cache">Supprimer cette cohorte</span></button>{% endif %}
+      <span class="visuellement-cache">Supprimer cette promotion</span></button>{% endif %}
   </div>
   {% endif %}
 </header>
@@ -39,80 +38,73 @@
   {% else %}<p>Le responsable ou l'administrateur doit d'abord importer une promotion.</p>{% endif %}
 </section>
 {% else %}
-<div id="cohorte-vue">
-  <section class="indicateurs">
-    <div class="carte indicateur"><div class="libelle">Étudiants suivis</div><div class="valeur tnum" id="kpi-effectif">–</div><div class="detail" id="kpi-moment">&nbsp;</div></div>
-    <div class="carte indicateur accent"><div class="libelle"><span class="point eleve"></span>En alerte</div><div class="valeur tnum" id="kpi-alerte">–</div><div class="detail">risque d'au moins 1 sur 6</div></div>
-    <div class="carte indicateur"><div class="libelle"><span class="point eleve"></span>Risque élevé</div><div class="valeur tnum" id="kpi-eleve">–</div><div class="detail">plus d'une chance sur deux</div></div>
-    <div class="carte indicateur"><div class="libelle"><span class="point faible"></span>Sans alerte</div><div class="valeur tnum" id="kpi-faible">–</div><div class="detail">suivi habituel</div></div>
-  </section>
-
-  <section class="carte capacite">
-    <div>
-      <h2>Capacité d'accompagnement</h2>
-      <p class="discret petit">Part des étudiants que l'équipe peut suivre de près ce semestre.</p>
-      <div class="curseur">
-        <input type="range" id="capacite" min="5" max="60" step="1" value="20" aria-label="Part des étudiants accompagnés">
-        <output id="capacite-valeur" for="capacite">20 %</output>
-      </div>
-    </div>
-    <div>
-      <p class="phrase" id="capacite-phrase">&nbsp;</p>
-      <div class="barre-file" id="barre-file" aria-hidden="true"></div>
-      <div class="legende-file"><span><i style="background:var(--marine)"></i>Accompagnés</span><span><i style="background:var(--moyen)"></i>En alerte, hors capacité</span><span><i style="background:var(--trait-fort)"></i>Sans alerte</span></div>
-    </div>
-  </section>
-
-  <div class="mise-en-page">
-    <section class="carte">
-      <div class="outils">
-        <div class="recherche"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-          <input class="champ" type="search" id="recherche" placeholder="Rechercher un nom ou un matricule" aria-label="Rechercher un nom ou un matricule"></div>
-        <div class="segments" role="group" aria-label="Niveau de risque" id="niveaux">
-          <button type="button" data-niveau="tous" aria-pressed="true">Tous</button>
-          <button type="button" data-niveau="alerte" aria-pressed="false">En alerte</button>
-          <button type="button" data-niveau="eleve" aria-pressed="false"><span class="point eleve"></span>Élevé</button>
-          <button type="button" data-niveau="moyen" aria-pressed="false"><span class="point moyen"></span>Moyen</button>
-          <button type="button" data-niveau="faible" aria-pressed="false"><span class="point faible"></span>Faible</button>
-        </div>
-        <select class="champ" id="filiere" aria-label="Filière"><option value="">Toutes les filières</option></select>
-        <label class="interrupteur"><input type="checkbox" id="prioritaires">File d'accompagnement seulement</label>
-        <label class="interrupteur" id="bascule-devenir" hidden><input type="checkbox" id="devenir">Devenir réel</label>
-      </div>
-      <div class="tableau-wrap">
-        <table class="liste">
-          <thead><tr><th>Rang</th><th>Étudiant</th><th>Risque d'abandon</th><th>Ce qui pèse le plus</th><th>Signaux</th><th>Suivi</th><th class="col-devenir" hidden>Devenir réel</th></tr></thead>
-          <tbody id="lignes"></tbody>
-        </table>
-      </div>
-      <div class="vide-liste" id="aucun" hidden>Aucun étudiant ne correspond à ces filtres.</div>
-      <div class="pagination"><span id="compte">&nbsp;</span>
-        <span class="actions"><button class="btn btn-petit" id="page-prec" type="button">Précédent</button><span id="page-num" class="tnum"></span><button class="btn btn-petit" id="page-suiv" type="button">Suivant</button></span></div>
-    </section>
-
-    <aside class="grille">
-      <section class="carte" id="carte-verification" hidden>
-        <div class="carte-tete"><h2>Cohorte au devenir connu</h2></div>
-        <div class="carte-corps"><p class="texte-court" id="verification"></p>
-          <p class="petit" style="margin-top:10px"><a href="{{ url_for('fiabilite.page') }}">Toute l'évaluation dans « Fiabilité du modèle »</a></p></div>
-      </section>
-      <section class="carte">
-        <div class="carte-tete"><h2>Où se concentrent les alertes</h2></div>
-        <div class="carte-corps"><p class="discret petit" style="margin-bottom:12px">Part des étudiants en alerte, par filière. Cliquez pour filtrer.</p>
-          <div class="barres" id="par-filiere"></div></div>
-      </section>
-      <section class="carte">
-        <div class="carte-tete"><h2>Sur quoi agir</h2></div>
-        <div class="carte-corps"><p class="discret petit" style="margin-bottom:12px">Pour les étudiants en alerte, domaine du facteur qui pèse le plus.</p>
-          <div class="barres" id="par-domaine"></div></div>
-      </section>
-    </aside>
+<section class="carte ruban">
+  <div class="cellule"><div class="libelle">Étudiants</div><div class="valeur tnum" id="kpi-effectif">–</div><div class="detail" id="kpi-moment">&nbsp;</div></div>
+  <div class="cellule accent"><div class="libelle"><span class="point eleve"></span>En alerte</div><div class="valeur tnum" id="kpi-alerte">–</div><div class="detail">risque d'au moins 1 sur 6</div></div>
+  <div class="cellule"><div class="libelle"><span class="point eleve"></span>Risque élevé</div><div class="valeur tnum" id="kpi-eleve">–</div><div class="detail">plus d'une chance sur deux</div></div>
+  <div class="cellule"><div class="libelle"><span class="point faible"></span>Sans alerte</div><div class="valeur tnum" id="kpi-faible">–</div><div class="detail">suivi habituel</div></div>
+  <div class="cellule capacite-cellule">
+    <div class="libelle">Capacité d'accompagnement</div>
+    <div class="curseur"><input type="range" id="capacite" min="5" max="60" step="1" value="20" aria-label="Part des étudiants accompagnés">
+      <output id="capacite-valeur" for="capacite">20 %</output></div>
+    <p class="phrase" id="capacite-phrase">&nbsp;</p>
+    <div class="barre-file" id="barre-file" aria-hidden="true"></div>
+    <div class="legende-file" style="grid-column:1 / -1"><span><i style="background:var(--marine)"></i>Accompagnés</span><span><i style="background:var(--moyen)"></i>En alerte, hors capacité</span><span><i style="background:var(--brume-2)"></i>Sans alerte</span></div>
   </div>
+</section>
+
+<div class="mise-en-page remplir">
+  <section class="carte feuille liste-cohorte">
+    <div class="outils">
+      <div class="recherche"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input class="champ" type="search" id="recherche" placeholder="Nom ou matricule" aria-label="Rechercher un nom ou un matricule"></div>
+      <div class="segments" role="group" aria-label="Niveau de risque" id="niveaux">
+        <button type="button" data-niveau="tous" aria-pressed="true">Tous</button>
+        <button type="button" data-niveau="alerte" aria-pressed="false">En alerte</button>
+        <button type="button" data-niveau="eleve" aria-pressed="false"><span class="point eleve"></span>Élevé</button>
+        <button type="button" data-niveau="moyen" aria-pressed="false"><span class="point moyen"></span>Moyen</button>
+        <button type="button" data-niveau="faible" aria-pressed="false"><span class="point faible"></span>Faible</button>
+      </div>
+      <select class="champ" id="filiere" aria-label="Filière"><option value="">Toutes les filières</option></select>
+      <label class="interrupteur"><input type="checkbox" id="prioritaires">File seulement</label>
+      <label class="interrupteur" id="bascule-devenir" hidden><input type="checkbox" id="devenir">Devenir réel</label>
+    </div>
+    <div class="tableau-wrap">
+      <table class="liste">
+        <thead><tr><th>Rang</th><th>Étudiant</th><th>Risque d'abandon</th><th class="col-large">Ce qui pèse le plus</th><th class="col-large">Suivi</th><th class="col-devenir" hidden>Devenir réel</th></tr></thead>
+        <tbody id="lignes"></tbody>
+      </table>
+      <div class="vide-liste" id="aucun" hidden>Aucun étudiant ne correspond à ces filtres.</div>
+    </div>
+    <div class="pied-liste"><span id="compte">&nbsp;</span><span>Entrée ou clic : aperçu · ↑ ↓ dans l'aperçu</span></div>
+  </section>
+
+  <aside class="colonne-laterale">
+    <section class="carte" id="carte-verification" hidden>
+      <div class="carte-tete"><h2>Cohorte au devenir connu</h2></div>
+      <div class="carte-corps"><p class="texte-court" id="verification"></p>
+        <p class="petit" style="margin-top:10px"><a href="{{ url_for('fiabilite.page') }}">Toute l'évaluation dans « Fiabilité du modèle »</a></p></div>
+    </section>
+    <section class="carte">
+      <div class="carte-tete"><h2>Où se concentrent les alertes</h2></div>
+      <div class="carte-corps"><p class="discret petit" style="margin-bottom:12px">Part des étudiants en alerte, par filière. Cliquez pour filtrer.</p>
+        <div class="barres" id="par-filiere"></div></div>
+    </section>
+    <section class="carte">
+      <div class="carte-tete"><h2>Sur quoi agir</h2></div>
+      <div class="carte-corps"><p class="discret petit" style="margin-bottom:12px">Pour les étudiants en alerte, domaine du facteur qui pèse le plus.</p>
+        <div class="barres" id="par-domaine"></div></div>
+    </section>
+  </aside>
 </div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
+<script>window.UTILISATEUR_ID = {{ utilisateur.id }};</script>
+<script src="{{ url_for('static', filename='js/fiche.js') }}"></script>
+<script src="{{ url_for('static', filename='js/suivi.js') }}"></script>
+<script src="{{ url_for('static', filename='js/apercu.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cohorte.js') }}"></script>
 <script>
 (function () {

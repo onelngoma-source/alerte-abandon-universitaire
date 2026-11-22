@@ -34,14 +34,18 @@
     </div></section>`;
   }
 
-  function carteTrajectoire(r) {
+  function carteTrajectoire(r, nu = false) {
     const points = r.trajectoire || [];
     const W = 600, H = 150, L = W - 40, x = (i) => W * (2 * i + 1) / 6, y = (p) => 10 + (1 - p) * (H - 20);
-    const bandes = `<rect x="0" y="${y(1)}" width="${L + 40}" height="${y(0.5) - y(1)}" fill="#FCEBEB"/>
-      <rect x="0" y="${y(0.5)}" width="${L + 40}" height="${y(1 / 6) - y(0.5)}" fill="#FFF4DB"/>
-      <rect x="0" y="${y(1 / 6)}" width="${L + 40}" height="${y(0) - y(1 / 6)}" fill="#E7F6EA"/>`;
-    const trace = points.length > 1 ? `<polyline points="${points.map((p, i) => `${x(i)},${y(p.probabilite)}`).join(' ')}" fill="none" stroke="#0D3863" stroke-width="2.5" stroke-linejoin="round"/>` : '';
-    const cercles = points.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.probabilite)}" r="6" fill="#fff" stroke="#0D3863" stroke-width="2.5"/>`).join('');
+    const bandes = `<defs><linearGradient id="trait-traj" x1="0" x2="1"><stop offset="0" stop-color="#3281E0"/><stop offset="1" stop-color="#0D3863"/></linearGradient></defs>
+      <rect x="0" y="${y(1)}" width="${L + 40}" height="${y(0.5) - y(1)}" fill="#FDECEC" rx="10"/>
+      <rect x="0" y="${y(0.5)}" width="${L + 40}" height="${y(1 / 6) - y(0.5)}" fill="#FFF4DA"/>
+      <rect x="0" y="${y(1 / 6)}" width="${L + 40}" height="${y(0) - y(1 / 6)}" fill="#E6F6E9" rx="10"/>
+      <text x="8" y="${y(1) + 14}" font-size="11" fill="#A32222" font-family="Inter">élevé</text>
+      <text x="8" y="${y(0.5) + 14}" font-size="11" fill="#875600" font-family="Inter">alerte</text>
+      <text x="8" y="${y(1 / 6) + 14}" font-size="11" fill="#1B6B2A" font-family="Inter">sans alerte</text>`;
+    const trace = points.length > 1 ? `<polyline points="${points.map((p, i) => `${x(i)},${y(p.probabilite)}`).join(' ')}" fill="none" stroke="url(#trait-traj)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+    const cercles = points.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.probabilite)}" r="7" fill="#fff" stroke="#0D3863" stroke-width="3"/>`).join('');
     const futurs = [0, 1, 2].slice(points.length).map((i) => `<line x1="${x(i)}" x2="${x(i)}" y1="${y(0.95)}" y2="${y(0.05)}" stroke="#CED6DF" stroke-dasharray="3 4"/>`).join('');
     const etapes = ['T0', 'T1', 'T2'].map((m, i) => {
       const p = points[i];
@@ -55,12 +59,12 @@
         : ecart < -2 ? `Le risque a <b>baissé de ${-ecart} points</b> depuis l'inscription : les résultats de l'année rassurent.`
           : "Le risque est resté stable depuis l'inscription.";
     }
-    return `<section class="carte c7 trajectoire"><div class="carte-corps">
-      <div class="sous-titre-bloc">Évolution au fil de l'année</div>
-      <svg viewBox="0 0 ${L + 40} ${H}" role="img" aria-label="Évolution du risque">${bandes}${futurs}${trace}${cercles}</svg>
+    const interieur = `<svg viewBox="0 0 ${L + 40} ${H}" role="img" aria-label="Évolution du risque">${bandes}${futurs}${trace}${cercles}</svg>
       <div class="etapes-traj">${etapes}</div>
-      <p class="phrase-risque petit">${commentaire}</p>
-    </div></section>`;
+      <p class="phrase-risque petit">${commentaire}</p>`;
+    if (nu) return interieur;
+    return `<section class="carte c7 trajectoire"><div class="carte-corps">
+      <div class="sous-titre-bloc">Évolution au fil de l'année</div>${interieur}</div></section>`;
   }
 
   function listeFacteurs(liste, sens) {
@@ -88,7 +92,7 @@
         <div><b>${echapper(c.titre || '')}</b><p>${echapper(c.message)}</p></div></li>`).join('')}</ul></div></section>`;
   }
 
-  function carteVoisins(r, classe) {
+  function carteVoisins(r, classe, ouvert = false) {
     const v = r.voisins_noyau; if (!v) return '';
     const k = v.abandons_parmi_plus_proches, n = v.plus_proches.length;
     const lignes = v.plus_proches.map((l) => `<tr><td>${l.rang}</td>${l.valeurs.map((x) => `<td class="tnum">${echapper(typeof x === 'number' ? x.toLocaleString('fr-FR') : x)}</td>`).join('')}
@@ -98,7 +102,7 @@
         <div class="voisins-resume"><div class="pastilles-voisins">${v.plus_proches.map((l) => `<i class="${l.abandon ? 'abandon' : 'reussite'}" title="${l.abandon ? 'Abandon' : 'Poursuite'}">${l.abandon ? '✕' : '✓'}</i>`).join('')}</div>
           <p><b>${k} sur ${n}</b> ont abandonné.</p></div>
         <p class="discret petit" style="margin-top:10px">Les ${n} étudiants des cohortes 2008 à 2014 dont le dossier, ${echapper(r.libelle_moment)}, ressemble le plus à celui-ci (approche à noyau de Nadaraya-Watson, sujet du mémoire). Un point de comparaison concret, à côté de l'estimation.</p>
-        <details class="depli"><summary>Voir leurs dossiers</summary>
+        <details class="depli" ${ouvert ? 'open' : ''}><summary>Voir leurs dossiers</summary>
           <div class="tableau-wrap"><table class="simple"><thead><tr><th>#</th>${v.colonnes.map((c) => `<th>${echapper(c)}</th>`).join('')}<th>Cohorte</th><th>Devenir</th></tr></thead><tbody>${lignes}</tbody></table></div>
         </details>
       </div></section>`;
@@ -139,5 +143,26 @@
     }
   }
 
-  window.Fiche = { rendre };
+  /* Le ruban en tete de fiche : risque, suivi, moment. Il reste visible quel que soit l'onglet. */
+  function ruban(d) {
+    const r = d.resultat, p = r.probabilite_ml, dos = d.dossier;
+    const suivi = dos
+      ? `<div class="ligne">${window.Commun.statut(dos.statut)}${dos.relance ? '<span class="etiquette alerte">Risque en hausse</span>' : ''}</div>
+         <div class="ligne"><span class="discret">Conseiller</span><b>${echapper(dos.conseiller || 'non attribué')}</b></div>
+         <div class="ligne"><span class="discret">Échéance</span><b class="${dos.echeance && new Date(dos.echeance + 'T23:59:59') < new Date() ? 'retard' : ''}">${window.Commun.date(dos.echeance)}</b>
+           <span class="discret">${dos.echeance ? window.Commun.relatif(dos.echeance) : ''}</span></div>`
+      : `<div class="ligne"><span class="statut s-clos">Aucun dossier ouvert</span></div>
+         <div class="ligne discret">${enAlerte(p) ? "Au-dessus du seuil d'alerte" : "Sous le seuil d'alerte"}</div>`;
+    const estimees = r.nb_variables_estimees ? `<div class="ligne discret">${r.nb_variables_estimees} information${r.nb_variables_estimees > 1 ? 's' : ''} complétée${r.nb_variables_estimees > 1 ? 's' : ''} par défaut</div>` : '';
+    return `<section class="carte ruban-fiche" id="ruban-fiche">
+      <div class="risque-ruban"><span class="chiffre tnum" data-risque="${p}">${(100 * p).toLocaleString('fr-FR', { maximumFractionDigits: 1 })}<small>%</small></span>
+        <div style="display:flex;gap:8px;align-items:center">${badge(p)}<span class="discret petit">risque d'abandon</span></div>
+        <div style="grid-column:2">${jauge(p, true)}</div></div>
+      <div class="info-ruban">${suivi}</div>
+      <div class="info-ruban"><div class="ligne"><span class="etiquette or">Estimé ${echapper(r.libelle_moment)}</span></div>${estimees}
+        <div class="ligne discret">${d.referent ? 'Référent : ' + echapper(d.referent.nom) : 'Pas de conseiller référent'}</div></div>
+    </section>`;
+  }
+
+  window.Fiche = { rendre, ruban, encarts, carteTrajectoire, listeFacteurs, cartePistes, carteVoisins, carteDossier, svg };
 })();

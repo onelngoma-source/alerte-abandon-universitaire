@@ -4,10 +4,10 @@
   'use strict';
   const { echapper, nombre, pct, niveau, enAlerte, badge, jauge, MOMENTS, MOMENTS_COURTS } = window.Commun;
   const $ = (id) => document.getElementById(id);
-  const PAR_PAGE = 25;
+  const PAR_LOT = 60;  // lignes ajoutees a chaque fois que l'on approche du bas de la liste
   const DOMAINES = { resultats: 'Résultats', finances: 'Finances', parcours: "Parcours d'entrée", profil: 'Profil' };
 
-  const etat = { cohorte: null, lignes: [], metriques: {}, capacite: 20, niveau: 'tous', filiere: '', recherche: '', prioritaires: false, devenir: false, page: 0 };
+  const etat = { cohorte: null, lignes: [], metriques: {}, capacite: 20, niveau: 'tous', filiere: '', recherche: '', prioritaires: false, devenir: false, affichees: 0, actif: null };
 
   function lireCapacite() {
     try { const v = Number(localStorage.getItem('capacite')); if (v >= 5 && v <= 60) etat.capacite = v; } catch (e) { /* rien */ }
@@ -45,14 +45,15 @@
     const n = etat.lignes.length;
     const alertes = etat.lignes.filter((l) => enAlerte(l.p_ml)).length;
     const eleves = etat.lignes.filter((l) => niveau(l.p_ml) === 'eleve').length;
-    $('kpi-effectif').textContent = nombre(n);
-    $('kpi-alerte').innerHTML = `${nombre(alertes)}<small>${pct(alertes / n)}</small>`;
-    $('kpi-eleve').innerHTML = `${nombre(eleves)}<small>${pct(eleves / n)}</small>`;
-    $('kpi-faible').innerHTML = `${nombre(n - alertes)}<small>${pct((n - alertes) / n)}</small>`;
+    const kpi = (id, k, part) => {
+      $(id).innerHTML = `<span>0</span>${part === undefined ? '' : `<small>${pct(part)}</small>`}`;
+      Commun.compter($(id).firstChild, k);
+    };
+    kpi('kpi-effectif', n); kpi('kpi-alerte', alertes, alertes / n); kpi('kpi-eleve', eleves, eleves / n); kpi('kpi-faible', n - alertes, (n - alertes) / n);
     const moments = {};
     etat.lignes.forEach((l) => { moments[l.mode] = (moments[l.mode] || 0) + 1; });
     const cles = Object.keys(moments).sort();
-    $('kpi-moment').textContent = cles.length === 1 ? 'Risque estimé ' + MOMENTS[cles[0]].toLowerCase()
+    $('kpi-moment').textContent = cles.length === 1 ? MOMENTS[cles[0]]
       : cles.map((m) => `${MOMENTS_COURTS[m]} : ${nombre(moments[m])}`).join(' · ');
   }
 
@@ -61,12 +62,12 @@
     const alertes = etat.lignes.filter((l) => enAlerte(l.p_ml)).length;
     $('capacite-valeur').textContent = etat.capacite + ' %';
     const dernier = etat.lignes[N - 1];
-    let phrase = `Vous pouvez accompagner <b>${nombre(N)} étudiants</b> : les ${nombre(N)} premiers de la liste, dont le risque va de ${pct(etat.lignes[0].p_ml)} à ${pct(dernier.p_ml)}. `;
+    let phrase = `<b>${nombre(N)} étudiants</b> accompagnés, de ${pct(etat.lignes[0].p_ml)} à ${pct(dernier.p_ml)} de risque. `;
     if (N >= alertes) {
-      phrase += alertes ? `Les <b>${nombre(alertes)} étudiants en alerte</b> sont tous couverts${N > alertes ? `, et ${nombre(N - alertes)} places restent pour des étudiants sous le seuil` : ''}.`
-        : 'Aucun étudiant n\'est en alerte dans cette cohorte.';
+      phrase += alertes ? `Toutes les alertes sont couvertes${N > alertes ? ` et ${nombre(N - alertes)} places restent libres` : ''}.`
+        : 'Aucun étudiant en alerte.';
     } else {
-      phrase += `<b>${nombre(alertes - N)} étudiants en alerte</b> restent hors capacité : à surveiller, ou à confier à un autre dispositif.`;
+      phrase += `<b>${nombre(alertes - N)} en alerte</b> restent hors capacité.`;
     }
     $('capacite-phrase').innerHTML = phrase;
     const accompagnes = N, horsCapacite = Math.max(0, alertes - N), reste = n - accompagnes - horsCapacite;
@@ -116,64 +117,90 @@
       : '<p class="discret petit">Aucun étudiant en alerte.</p>';
   }
 
-  function tableau() {
+  function ligneHTML(l, N) {
+    const alerte = enAlerte(l.p_ml);
+    const classes = [l.rang > N ? 'hors-file' : '', l.rang === N ? 'limite' : '', l.id === etat.actif ? 'actif' : ''].join(' ');
+    const devenir = l.abandon_reel === 1 ? '<span class="badge eleve">Abandon</span>' : l.abandon_reel === 0 ? '<span class="badge faible">Poursuite</span>' : '–';
+    return `<tr class="${classes}" data-id="${l.id}" tabindex="0" aria-label="Aperçu de ${echapper(l.nom || l.reference)}">
+      <td class="rang tnum">${l.rang}</td>
+      <td class="etudiant"><b>${echapper(l.nom || l.reference)}</b><span>${echapper(l.filiere || 'Filière non renseignée')} · ${{ T0: 'inscription', T1: 'semestre 1', T2: 'semestre 2' }[l.mode]}</span></td>
+      <td><div class="risque-cellule"><span class="pct tnum">${Math.round(100 * l.p_ml)} %</span>${jauge(l.p_ml)}${badge(l.p_ml)}</div></td>
+      <td class="facteur col-large">${alerte && l.facteur ? `${echapper(l.facteur)}` : '<span class="discret">–</span>'}<div class="signaux">${signaux(l)}</div></td>
+      <td class="cellule-suivi col-large">${l.dossier_statut ? `${Commun.statut(l.dossier_statut)}<span class="dom">${echapper(l.conseiller || 'non attribué')}</span>` : '<span class="discret">–</span>'}</td>
+      <td class="col-devenir" ${etat.devenir ? '' : 'hidden'}>${devenir}</td></tr>`;
+  }
+
+  /* La liste defile dans sa feuille : on ajoute des lignes par lots quand on approche du bas. */
+  function completer() {
     const N = nbAccompagnes();
-    const liste = filtrees();
-    const pages = Math.max(1, Math.ceil(liste.length / PAR_PAGE));
-    etat.page = Math.min(etat.page, pages - 1);
-    const visibles = liste.slice(etat.page * PAR_PAGE, (etat.page + 1) * PAR_PAGE);
+    const lot = etat.liste.slice(etat.affichees, etat.affichees + PAR_LOT);
+    if (!lot.length) return;
+    const ancienne = $('lignes').querySelector('.sentinelle');
+    if (ancienne) ancienne.remove();
+    $('lignes').insertAdjacentHTML('beforeend', lot.map((l) => ligneHTML(l, N)).join(''));
+    etat.affichees += lot.length;
+    if (etat.affichees < etat.liste.length) {
+      $('lignes').insertAdjacentHTML('beforeend', `<tr class="sentinelle"><td colspan="6">${nombre(etat.liste.length - etat.affichees)} étudiants de plus…</td></tr>`);
+      observateur.observe($('lignes').querySelector('.sentinelle'));
+    }
+  }
+  const observateur = new IntersectionObserver((entrees) => {
+    if (entrees.some((e) => e.isIntersecting)) completer();
+  }, { root: document.querySelector('.liste-cohorte .tableau-wrap'), rootMargin: '400px' });
+
+  function tableau(garderDefilement = false) {
+    const zone = document.querySelector('.liste-cohorte .tableau-wrap');
+    const position = zone.scrollTop, deja = etat.affichees;
+    etat.liste = filtrees();
     document.querySelectorAll('.col-devenir').forEach((c) => { c.hidden = !etat.devenir; });
-    $('lignes').innerHTML = visibles.map((l) => {
-      const alerte = enAlerte(l.p_ml);
-      const classes = [l.rang > N ? 'hors-file' : '', l.rang === N ? 'limite' : ''].join(' ');
-      const devenir = l.abandon_reel === 1 ? '<span class="badge eleve">Abandon</span>' : l.abandon_reel === 0 ? '<span class="badge faible">Poursuite</span>' : '–';
-      return `<tr class="${classes}" data-id="${l.id}" tabindex="0" aria-label="Ouvrir la fiche de ${echapper(l.reference)}">
-        <td class="rang tnum">${l.rang}</td>
-        <td class="etudiant"><b>${echapper(l.nom || l.reference)}</b><span>${echapper(l.filiere || 'Filière non renseignée')} · ${{ T0: 'inscription', T1: 'semestre 1', T2: 'semestre 2' }[l.mode]}</span></td>
-        <td><div class="risque-cellule"><span class="pct tnum">${Math.round(100 * l.p_ml)} %</span>${jauge(l.p_ml)}${badge(l.p_ml)}</div></td>
-        <td class="facteur">${alerte && l.facteur ? `${echapper(l.facteur)}<span class="dom">${DOMAINES[l.domaine_facteur] || ''}</span>` : '<span class="discret">–</span>'}</td>
-        <td><div class="signaux">${signaux(l)}</div></td>
-        <td>${l.dossier_statut ? `${Commun.statut(l.dossier_statut)}<span class="dom">${echapper(l.conseiller || 'non attribué')}</span>` : '<span class="discret">–</span>'}</td>
-        <td class="col-devenir" ${etat.devenir ? '' : 'hidden'}>${devenir}</td></tr>`;
-    }).join('');
-    $('aucun').hidden = liste.length > 0;
-    $('compte').textContent = `${nombre(liste.length)} étudiant${liste.length > 1 ? 's' : ''}` + (liste.length !== etat.lignes.length ? ` sur ${nombre(etat.lignes.length)}` : '');
-    $('page-num').textContent = `${etat.page + 1} / ${pages}`;
-    $('page-prec').disabled = etat.page === 0;
-    $('page-suiv').disabled = etat.page >= pages - 1;
-    etat.liste = liste;
+    $('lignes').innerHTML = ''; etat.affichees = 0;
+    completer();
+    while (garderDefilement && etat.affichees < Math.min(deja, etat.liste.length)) completer();
+    zone.scrollTop = garderDefilement ? position : 0;
+    $('aucun').hidden = etat.liste.length > 0;
+    $('compte').textContent = `${nombre(etat.liste.length)} étudiant${etat.liste.length > 1 ? 's' : ''}` + (etat.liste.length !== etat.lignes.length ? ` sur ${nombre(etat.lignes.length)}` : '');
   }
 
   function toutAfficher() { indicateurs(); capacite(); verification(); barresFilieres(); tableau(); }
 
+  function surligner(id) {
+    etat.actif = id;
+    $('lignes').querySelectorAll('tr.actif').forEach((tr) => tr.classList.remove('actif'));
+    const tr = $('lignes').querySelector(`tr[data-id="${id}"]`);
+    if (tr) { tr.classList.add('actif'); tr.scrollIntoView({ block: 'nearest', behavior: Commun.calme() ? 'auto' : 'smooth' }); }
+  }
+
   function ouvrir(id) {
-    try { sessionStorage.setItem('file-' + etat.cohorte.id, JSON.stringify(etat.liste.map((l) => l.id))); } catch (e) { /* rien */ }
-    location.href = '/etudiants/' + id;
+    const ids = etat.liste.map((l) => l.id);
+    try { sessionStorage.setItem('file-' + etat.cohorte.id, JSON.stringify(ids)); } catch (e) { /* rien */ }
+    Apercu.ouvrir(id, ids, {
+      surSelection: surligner,
+      surChangement: () => charger(etat.cohorte.id, true),
+      surFermeture: () => { etat.actif = null; $('lignes').querySelectorAll('tr.actif').forEach((tr) => tr.classList.remove('actif')); },
+    });
   }
 
   function brancher() {
     $('capacite').addEventListener('input', (e) => {
       etat.capacite = Number(e.target.value);
       try { localStorage.setItem('capacite', String(etat.capacite)); } catch (err) { /* rien */ }
-      capacite(); verification(); tableau();
+      capacite(); verification(); tableau(true);
     });
     $('niveaux').addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
-      etat.niveau = b.dataset.niveau; etat.page = 0;
+      etat.niveau = b.dataset.niveau;
       $('niveaux').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
       tableau();
     });
-    $('filiere').addEventListener('change', (e) => { etat.filiere = e.target.value; etat.page = 0; tableau(); });
+    $('filiere').addEventListener('change', (e) => { etat.filiere = e.target.value; tableau(); });
     $('par-filiere').addEventListener('click', (e) => {
       const b = e.target.closest('[data-filiere]'); if (!b) return;
       etat.filiere = etat.filiere === b.dataset.filiere ? '' : b.dataset.filiere;
-      $('filiere').value = etat.filiere; etat.page = 0; tableau();
+      $('filiere').value = etat.filiere; tableau();
     });
-    $('recherche').addEventListener('input', (e) => { etat.recherche = e.target.value; etat.page = 0; tableau(); });
-    $('prioritaires').addEventListener('change', (e) => { etat.prioritaires = e.target.checked; etat.page = 0; tableau(); });
-    $('devenir').addEventListener('change', (e) => { etat.devenir = e.target.checked; tableau(); });
-    $('page-prec').addEventListener('click', () => { etat.page -= 1; tableau(); });
-    $('page-suiv').addEventListener('click', () => { etat.page += 1; tableau(); });
+    $('recherche').addEventListener('input', (e) => { etat.recherche = e.target.value; tableau(); });
+    $('prioritaires').addEventListener('change', (e) => { etat.prioritaires = e.target.checked; tableau(); });
+    $('devenir').addEventListener('change', (e) => { etat.devenir = e.target.checked; tableau(true); });
     $('lignes').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) ouvrir(Number(tr.dataset.id)); });
     $('lignes').addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return; const tr = e.target.closest('tr[data-id]'); if (tr) ouvrir(Number(tr.dataset.id));
@@ -181,15 +208,16 @@
   }
 
   let branche = false;
-  async function charger(id) {
+  async function charger(id, discret = false) {
     const res = await fetch('/api/cohortes/' + id);
     if (!res.ok) { location.href = '/tableau'; return; }
     const d = await res.json();
     etat.cohorte = d.cohorte; etat.metriques = d.metriques || {};
     etat.lignes = d.lignes.slice().sort((a, b) => b.p_ml - a.p_ml || a.id - b.id);
     etat.lignes.forEach((l, i) => { l.rang = i + 1; });
-    etat.page = 0; etat.filiere = '';
     if (!branche) { lireCapacite(); brancher(); branche = true; }
+    if (discret) { tableau(true); return; }  // apres une operation dans l'apercu : on garde la place dans la liste
+    etat.filiere = '';
     toutAfficher();
   }
 

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block titre %}Comptes · Alerte précoce{% endblock %}
 {% block contenu %}
-<header class="entete-page"><div class="titres"><div class="sur-titre">Administration</div><h1>Comptes et rôles</h1>
+<header class="entete-page"><div class="titres"><h1>Comptes et rôles</h1>
   <p class="sous-titre">Un compte par personne, jamais de compte partagé : c'est ce qui rend le journal d'activité utile.
     Le <b>conseiller</b> suit ses dossiers ; le <b>responsable</b> attribue, importe et pilote ; l'<b>administrateur</b> gère en plus les comptes et les données.</p></div>
   <div class="actions"><button class="btn btn-plein" id="nouveau" type="button" {{ 'disabled title="Indisponible en démonstration"' | safe if mode_demo }}>Nouveau compte</button></div></header>
-<section class="carte"><div class="tableau-wrap"><table class="liste" id="comptes">
+<section class="carte feuille remplir"><div class="tableau-wrap"><table class="liste" id="comptes">
   <thead><tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Dernière connexion</th><th>État</th><th></th></tr></thead><tbody></tbody></table></div></section>
 
 <dialog class="modale" id="modale-compte"><form class="carte-corps" id="form-compte" method="dialog">

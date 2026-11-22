@@ -3,32 +3,27 @@
 {% block contenu %}
 <header class="entete-page">
   <div class="titres">
-    <div class="sur-titre">Fiabilité du modèle</div>
     <h1>Jusqu'où faire confiance à l'estimation&nbsp;?</h1>
-    <p class="sous-titre">Le modèle a été construit sur les cohortes 2008 à 2014, puis évalué une seule fois sur les
-      <b id="intro-effectif">1 227</b> étudiants des cohortes 2015 à 2017, qu'il n'avait jamais vus. Tout ce qui suit est
-      recalculé sur ces cohortes avec les modèles de l'application.</p>
+    <p class="sous-titre">Construit sur les cohortes 2008 à 2014, le modèle a été évalué une seule fois sur les
+      <b id="intro-effectif">1 227</b> étudiants des cohortes 2015 à 2017, qu'il n'avait jamais vus. Modèle en service : {{ modele_version }}.</p>
   </div>
   <div class="actions"><a class="btn" href="https://github.com/onelngoma-source/abandon-universitaire" target="_blank" rel="noopener">Projet de recherche ↗</a></div>
 </header>
 
 <section class="indicateurs" id="kpis"></section>
 
-<section class="carte" style="margin-bottom:16px" id="surveillance">
-  <div class="carte-tete"><h2>Sur votre établissement</h2><span class="discret">modèle en service : {{ modele_version }}</span></div>
-  <div class="carte-corps">
-    <p class="texte-court" style="margin-bottom:14px">Les chiffres de référence viennent d'une autre université. Dès que le devenir réel de vos étudiants
-      est connu (fin d'année), l'outil recalcule ses performances sur eux et signale tout écart net : il faudra alors
-      recalibrer ou réentraîner le modèle, selon la procédure du guide de mise en service.</p>
-    <div class="tableau-wrap"><table class="simple" id="table-surveillance"></table></div>
-    <div id="signaux-surveillance" class="pile" style="margin-top:12px"></div>
-  </div>
-</section>
-
-<div class="grille" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); margin-bottom:16px" id="ligne-1">
+<div class="remplir" id="zone-fiabilite" style="display:flex;flex-direction:column;gap:12px">
+  <nav class="onglets" role="tablist" aria-label="Sections">
+    <button role="tab" data-onglet="capacite">Capacité et seuil</button>
+    <button role="tab" data-onglet="calibration">Calibration et équité</button>
+    <button role="tab" data-onglet="comparaison">Comparaison des modèles</button>
+    <button role="tab" data-onglet="etablissement">Votre établissement</button>
+  </nav>
+  <div class="panneaux remplir">
+<div class="panneau grille-fit" data-panneau="capacite" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)" id="ligne-1">
   <section class="carte">
     <div class="carte-tete"><h2>Si nous accompagnons une part des étudiants…</h2></div>
-    <div class="carte-corps">
+    <div class="carte-corps corps-graphique">
       <p class="discret petit" style="margin-bottom:10px">Part des abandons réels repérés en accompagnant les étudiants les plus à risque d'abord.</p>
       <div class="graphique"><canvas id="graphique-capacite" aria-label="Courbe de capacité"></canvas></div>
       <div class="legende-modeles" style="margin-top:10px"><span><i style="background:#0D3863"></i>Fin du 2e semestre</span><span><i style="background:#3281E0"></i>Fin du 1er semestre</span><span><i style="background:#D8B85C"></i>Inscription</span><span><i style="background:#CED6DF"></i>Au hasard</span></div>
@@ -42,16 +37,16 @@
         aurait réussi. Nous avons retenu un rapport de <b>5 pour 1</b>. Il est alors rentable d'alerter dès que :</p>
       <div class="formule">risque ≥ 1 / (1 + 5) = 1/6 ≈ 16,7 %</div>
       <p class="texte-court">Ce calcul n'a de sens que si les probabilités sont justes. C'est le cas : quand le modèle annonce
-        20 %, environ 20 % de ces étudiants abandonnent réellement (graphique ci-dessous).</p>
+        20 %, environ 20 % de ces étudiants abandonnent réellement (onglet « Calibration et équité »).</p>
       <table class="simple" id="table-moments" style="margin-top:14px"></table>
     </div>
   </section>
 </div>
 
-<div class="grille" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr); margin-bottom:16px" id="ligne-2">
+<div class="panneau grille-fit" data-panneau="calibration" hidden style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)" id="ligne-2">
   <section class="carte">
     <div class="carte-tete"><h2>Des probabilités justes</h2></div>
-    <div class="carte-corps">
+    <div class="carte-corps corps-graphique">
       <p class="discret petit" style="margin-bottom:10px">Étudiants de test répartis en dix groupes selon le risque annoncé (fin du 2e semestre).
         Plus les points sont près de la diagonale, plus l'annonce est fidèle.</p>
       <div class="graphique"><canvas id="graphique-calibration" aria-label="Calibration"></canvas></div>
@@ -69,7 +64,7 @@
   </section>
 </div>
 
-<div class="grille" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)" id="ligne-3">
+<div class="panneau grille-fit" data-panneau="comparaison" hidden style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)" id="ligne-3">
   <section class="carte">
     <div class="carte-tete"><h2>Pourquoi la régression logistique</h2><span class="discret">ROC-AUC sur les cohortes 2015 à 2017</span></div>
     <div class="carte-corps">
@@ -96,6 +91,21 @@
       </ul>
     </div>
   </section>
+</div>
+<div class="panneau grille-fit" data-panneau="etablissement" hidden style="grid-template-columns:minmax(0,1fr)">
+<section class="carte" id="surveillance">
+  <div class="carte-tete"><h2>Sur votre établissement</h2></div>
+  <div class="carte-corps">
+    <p class="texte-court" style="margin-bottom:14px">Les chiffres de référence viennent d'une autre université. Dès que le devenir réel de vos étudiants
+      est connu (fin d'année), l'outil recalcule ses performances sur eux et signale tout écart net : il faudra alors
+      recalibrer ou réentraîner le modèle, selon la procédure du guide de mise en service.</p>
+    <div class="tableau-wrap"><table class="simple" id="table-surveillance"></table></div>
+    <div id="signaux-surveillance" class="pile" style="margin-top:12px"></div>
+  </div>
+</section>
+
+</div>
+  </div>
 </div>
 {% endblock %}
 

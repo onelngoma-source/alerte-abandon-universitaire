@@ -37,7 +37,6 @@
 {% block contenu %}
 <header class="entete-page">
   <div class="titres">
-    <div class="sur-titre">Évaluer un étudiant</div>
     <h1>Estimer le risque d'un dossier</h1>
     <p class="sous-titre">Renseignez ce que vous savez. Le risque se recalcule à chaque modification, avec le modèle du moment
       atteint : l'inscription, la fin du 1er semestre ou la fin du 2e semestre.</p>
@@ -53,8 +52,8 @@
   </div>
 </header>
 
-<div class="saisie">
-  <form id="formulaire" novalidate>
+<div class="saisie remplir">
+  <form id="formulaire" class="defile" novalidate>
     <section class="carte etape-saisie">
       <div class="carte-tete"><span class="num-etape">1</span><h2>À l'inscription</h2></div>
       <div class="champs">
@@ -73,11 +72,11 @@
     </section>
     {{ semestre('1st', 'Fin du 1er semestre', 2) }}
     {{ semestre('2nd', 'Fin du 2e semestre', 3) }}
-    <p class="discret petit">Les informations non renseignées sont complétées par la valeur la plus courante chez les étudiants
+    <p class="petit" style="color:rgba(255,255,255,.6)">Les informations non renseignées sont complétées par la valeur la plus courante chez les étudiants
       des cohortes 2008 à 2014, et la fiche le signale.</p>
   </form>
 
-  <div class="resultat-saisie" id="resultat" aria-live="polite">
+  <div class="resultat-saisie defile" id="resultat" aria-live="polite">
     <div class="carte attente">
       <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l5-6 4 4 7-9"/></svg>
       <h2>L'estimation apparaîtra ici</h2>
