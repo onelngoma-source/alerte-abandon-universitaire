@@ -14,7 +14,7 @@
   <div class="pagination"><span id="page-info"></span><span class="actions"><button class="btn btn-petit" id="prec">Plus récents</button><button class="btn btn-petit" id="suiv">Plus anciens</button></span></div></section>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   const { echapper, api, dateHeure } = Commun;
   let page = 0;

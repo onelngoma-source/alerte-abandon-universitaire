@@ -76,14 +76,17 @@ détecte aussi bien dans chaque groupe ; ce n'est pas le cas pour les boursiers,
 ### Base de données
 
 En production, utilisez **PostgreSQL** (sauvegardes, accès concurrents). SQLite convient pour un essai ou une
-démonstration. L'application crée elle-même ses tables au premier démarrage.
+démonstration. L'application crée elle-même ses tables au premier démarrage, puis applique à chaque démarrage les
+migrations en attente (dossier `migrations/`) : une mise à jour du logiciel met la base à niveau sans la recréer.
+Une base créée par une version antérieure est reconnue et reprise sans perte.
 
 ### Variables d'environnement
 
 | Variable | Valeur en production | Rôle |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://utilisateur:motdepasse@hote:5432/alerte` | base PostgreSQL |
-| `FLASK_SECRET_KEY` | 64 caractères aléatoires (`python -c "import secrets; print(secrets.token_hex(32))"`) | signature des sessions ; à garder secrète et stable |
+| `FLASK_SECRET_KEY` | 64 caractères aléatoires (`python -c "import secrets; print(secrets.token_hex(32))"`) | signature des sessions ; recommandée. Sans elle, une clé est tirée une fois et gardée en base |
+| `PROXYS_DE_CONFIANCE` | `1` derrière nginx, Caddy ou un hébergeur ; `0` sinon | nombre de proxys dont on accepte l'adresse transmise (verrouillage, journal). Automatique sur Render |
 | `ADMIN_IDENTIFIANT` | identifiant du premier administrateur | créé au premier démarrage seulement |
 | `ADMIN_MDP_HACHE` | empreinte du mot de passe (`python -c "from werkzeug.security import generate_password_hash as g; print(g('...'))"`) | sans elle : « changez-moi », à changer à la première connexion |
 | `MODE_DEMO` | `0` | **obligatoire** : sinon, comptes fictifs et données de test |
@@ -93,13 +96,35 @@ démonstration. L'application crée elle-même ses tables au premier démarrage.
 | `DUREE_CONSERVATION_ANNEES` | `3` (ou la durée déclarée) | conservation des données |
 | `DELAI_PREMIER_CONTACT_JOURS`, `DELAI_ENTRETIEN_JOURS`, `DELAI_POINT_SUIVI_JOURS` | `7`, `14`, `30` | échéances automatiques |
 | `SMTP_HOTE`, `SMTP_PORT`, `SMTP_UTILISATEUR`, `SMTP_MDP`, `SMTP_EXPEDITEUR`, `URL_APPLICATION` | selon la messagerie de l'établissement | rappels quotidiens (section 6) |
+| `SAUVEGARDE_CLE` | `python -m outils.sauvegarde cle` | chiffre et scelle les sauvegardes ; **à garder aussi hors du serveur** |
+| `SAUVEGARDE_DOSSIER`, `SAUVEGARDE_GARDER` | `/srv/sauvegardes`, `30` | où ranger les sauvegardes, combien en garder |
+| `DEPOT_SCOLARITE` | `/srv/depot-scolarite` | dossier où le logiciel de scolarité dépose ses fichiers (facultatif) |
 
 ### Démarrage
 
 ```bash
 pip install -r requirements.txt
-gunicorn -w 2 --threads 4 --timeout 120 -b 0.0.0.0:8000 app:app
+gunicorn -w 2 --threads 4 --timeout 120 -b 127.0.0.1:8000 app:app   # derrière nginx ou Caddy, en HTTPS
 ```
+
+Plusieurs processus peuvent tourner en parallèle : verrouillage de connexion, clé de session et migrations sont
+partagés par la base. La sonde `/sante` (sans connexion, sans donnée personnelle) permet à la supervision de
+vérifier toutes les minutes que la base répond, que le schéma est à jour et que la dernière sauvegarde vérifiée
+a moins de 26 heures.
+
+### Tâches planifiées
+
+```cron
+# sauvegarde chiffrée, vérifiée par restauration complète, 30 conservées
+15 2 * * *    cd /srv/alerte && python -m outils.sauvegarde creer --verifier
+# rappels aux conseillers, les jours ouvrés
+0 7 * * 1-5   cd /srv/alerte && python -m outils.rappels
+# imports automatiques déposés par le logiciel de scolarité (si cette voie est retenue)
+5 7-19 * * 1-5 cd /srv/alerte && python -m outils.synchroniser
+```
+
+Copiez régulièrement le dossier des sauvegardes **hors du serveur** (autre machine, autre bâtiment). Le guide de
+passation (`docs/PASSATION.md`) détaille la restauration, les migrations et les gestes de secours.
 
 Placez l'application derrière un serveur HTTPS (nginx, Caddy, ou l'hébergeur). Ne l'exposez jamais en HTTP simple :
 les fiches contiennent des données personnelles.
@@ -116,16 +141,26 @@ les fiches contiennent des données personnelles.
 ## 5. Sécurité : ce qui est en place, ce qui reste à faire
 
 **En place dans l'application.** Comptes nominatifs et trois rôles ; mots de passe hachés, 10 caractères au moins,
-changement imposé à la première connexion ; verrouillage après 5 échecs de connexion depuis une même adresse ;
-jeton anti-CSRF sur toute modification ; cookies `HttpOnly`, `SameSite`, `Secure` (avec `COOKIE_SECURISE=1`) ;
-session de 8 heures ; un compte désactivé perd sa session immédiatement ; journal de toutes les connexions,
-consultations de fiches, imports, exports et modifications ; les courriels de rappel ne contiennent que le matricule
-et l'échéance.
+changement imposé à la première connexion ; verrouillage après 5 échecs depuis une même adresse ou 10 sur un même
+compte, noté en base (commun à tous les processus, insensible aux en-têtes falsifiés) ; jeton anti-CSRF sur toute
+modification ; politique de contenu (CSP) qui n'autorise que les scripts du site ; HSTS, `no-store` sur les pages et
+réponses qui contiennent des données personnelles ; cookies `HttpOnly`, `SameSite`, `Secure` (avec
+`COOKIE_SECURISE=1`) ; session de 8 heures ; un compte désactivé perd sa session immédiatement ; journal de toutes
+les connexions, consultations de fiches, imports, exports et modifications ; les courriels de rappel ne contiennent
+que le matricule et l'échéance.
+
+**Fourni, à planifier par l'établissement.** Sauvegarde chiffrée et scellée, vérifiée par une restauration complète
+dans une base vierge (`outils/sauvegarde.py`) ; raccordement au logiciel de scolarité par jeton de service révocable
+(page « Données ») ou par dossier de dépôt ; console de secours pour réinitialiser un compte (`outils/comptes.py`).
+
+**Vérifié à chaque modification du code.** L'intégration continue (`.github/workflows/tests.yml`) lance toute la suite
+de tests sur SQLite et PostgreSQL, navigateur compris, puis une analyse de sécurité du code (bandit) et des
+vulnérabilités connues des dépendances (pip-audit).
 
 **À la charge de l'établissement.**
 
-- sauvegarde quotidienne chiffrée de la base (`pg_dump`), conservée hors du serveur, et un essai de restauration par
-  trimestre ;
+- planifier la sauvegarde quotidienne (`--verifier`), copier les fichiers hors du serveur, garder `SAUVEGARDE_CLE`
+  dans un coffre ; une restauration complète sur une machine d'essai chaque trimestre ;
 - HTTPS, pare-feu, mises à jour du système et de PostgreSQL ;
 - revue des comptes à chaque départ d'un agent (désactiver, ne pas supprimer : le journal reste lisible) ;
 - consultation du journal en cas de doute, et procédure de notification en cas de violation de données ;
@@ -243,8 +278,11 @@ filière), avec l'accord de l'établissement et dans le respect de l'égalité d
 - [ ] Déclaration (ou demande d'autorisation) déposée auprès de l'APDPVP ; récépissé reçu
 - [ ] Mention d'information publiée (règlement des études, espace numérique, dossier d'inscription)
 - [ ] Charte signée par chaque utilisateur
-- [ ] PostgreSQL, HTTPS, `MODE_DEMO=0`, `COOKIE_SECURISE=1`, `FLASK_SECRET_KEY` stable
-- [ ] Sauvegarde quotidienne en place et restauration testée
+- [ ] PostgreSQL, HTTPS, `MODE_DEMO=0`, `COOKIE_SECURISE=1`, `FLASK_SECRET_KEY` stable, `PROXYS_DE_CONFIANCE` réglé
+- [ ] Sauvegarde quotidienne chiffrée et vérifiée planifiée, copie hors du serveur, clé dans un coffre
+- [ ] Une restauration faite pour de bon sur une machine d'essai (`outils.sauvegarde restaurer`)
+- [ ] Sonde `/sante` branchée sur la supervision
+- [ ] Une personne de la direction informatique a lu `docs/PASSATION.md` et sait faire chaque geste de secours
 - [ ] Un compte par personne ; mot de passe administrateur changé
 - [ ] Validation rétrospective faite (section 7) ; recalibration si nécessaire
 - [ ] Rappels par courriel programmés et testés (`--essai`)

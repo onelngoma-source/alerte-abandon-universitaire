@@ -24,9 +24,11 @@ def base_de_test(tmp_path, monkeypatch, nom="test.db"):
     if url:
         monkeypatch.setenv("DATABASE_URL", url)
         import db
-        from sqlalchemy import create_engine
+        from sqlalchemy import MetaData, create_engine
         moteur_bd = create_engine(db.url_base())
-        db.meta.drop_all(moteur_bd)
+        existantes = MetaData()
+        existantes.reflect(moteur_bd)  # toutes les tables, y compris l'historique des migrations
+        existantes.drop_all(moteur_bd)
         moteur_bd.dispose()
     else:
         monkeypatch.setenv("DB_PATH", str(tmp_path / nom))

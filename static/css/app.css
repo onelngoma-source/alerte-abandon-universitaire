@@ -56,6 +56,7 @@ a:hover { text-decoration:underline; }
 .petit { font-size:12.5px; }
 .visuellement-cache { position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 code { font-size:.92em; background:var(--brume-2); padding:1px 5px; border-radius:5px; }
+.entete-page code { background:rgba(255,255,255,.12); color:var(--or-clair); }
 
 /* défilement discret, à l'intérieur des feuilles */
 .defile, .tableau-wrap, .principal { scrollbar-width:thin; scrollbar-color:rgba(13,56,99,.28) transparent; }

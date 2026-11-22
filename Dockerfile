@@ -25,6 +25,10 @@ RUN mkdir -p instance && chmod -R 777 instance
 
 EXPOSE 10000
 
+# Sonde de sante : base joignable et schema a jour (voir /sante)
+HEALTHCHECK --interval=60s --timeout=10s --start-period=90s --retries=3 \
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/sante' % os.environ.get('PORT', '10000'), timeout=8)"
+
 # Forme shell, et non exec, pour que ${PORT} soit bien substitue au demarrage.
 # MODE_DEMO=1 : comptes fictifs, suivi deja engage, aucune operation destructrice. Pour un etablissement,
 # MODE_DEMO=0 et DATABASE_URL (PostgreSQL) : voir GUIDE_MISE_EN_SERVICE.md.

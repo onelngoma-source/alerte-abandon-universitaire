@@ -24,7 +24,9 @@ LIBELLES_JOURNAL = {
     "mise_a_jour_resultats": "Mise à jour des résultats", "saisie_devenir": "Saisie du devenir réel", "referent": "Référent",
     "creation_compte": "Création de compte", "modification_compte": "Modification de compte",
     "reinitialisation_mdp": "Réinitialisation de mot de passe", "suppression_promotion": "Suppression d'une promotion",
-    "purge": "Purge de données", "vidage_base": "Vidage de la base",
+    "purge": "Purge de données", "vidage_base": "Vidage de la base", "connexion_bloquee": "Connexion bloquée (trop d'échecs)",
+    "creation_jeton": "Création d'un jeton de raccordement", "revocation_jeton": "Révocation d'un jeton de raccordement",
+    "synchronisation": "Import automatique (système de scolarité)", "sauvegarde": "Sauvegarde de la base",
 }
 
 
@@ -161,7 +163,8 @@ def lire_journal():
 @role_requis("admin")
 def page_donnees():
     return render_template("admin_donnees.html", actif="admin_donnees", duree=DUREE_CONSERVATION_ANNEES,
-                           modele_version=current_app.moteur.version, base=db.url_base().split(":", 1)[0])
+                           modele_version=current_app.moteur.version, base=db.url_base().split(":", 1)[0],
+                           revision=db.revision_schema())
 
 
 @bp.get("/api/admin/donnees")
@@ -180,7 +183,9 @@ def etat_donnees():
         derniere = aware(p["derniere_maj"] or p["cree_le"])
         p["a_purger"] = derniere < limite
         p["cree_le"], p["derniere_maj"] = p["cree_le"].isoformat(), derniere.isoformat()
-    return jsonify({"promotions": promotions, "totaux": totaux, "duree_annees": DUREE_CONSERVATION_ANNEES})
+    from outils.sauvegarde import derniere
+    return jsonify({"promotions": promotions, "totaux": totaux, "duree_annees": DUREE_CONSERVATION_ANNEES,
+                    "sauvegarde": derniere()})
 
 
 @bp.post("/api/admin/purge")

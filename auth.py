@@ -2,7 +2,8 @@
 
   - un compte par personne, trois roles : conseiller, responsable, administrateur ;
   - mots de passe haches (werkzeug), 10 caracteres au moins, changement impose a la premiere connexion ;
-  - verrouillage temporaire apres 5 echecs de connexion depuis une meme adresse ;
+  - verrouillage temporaire apres 5 echecs depuis une meme adresse, ou 10 sur un meme identifiant (meme depuis
+    des adresses differentes) ; les echecs sont notes en base, donc communs a tous les processus du serveur ;
   - jeton anti-CSRF sur toutes les requetes qui modifient quelque chose ;
   - journal des connexions, reussies ou non.
 Au premier demarrage sur une base vide, un administrateur est cree a partir des variables ADMIN_IDENTIFIANT
@@ -10,12 +11,12 @@ et ADMIN_MDP_HACHE (sinon « admin » / « changez-moi », a changer des la prem
 """
 import os
 import secrets
-import time
+from datetime import timedelta
 from functools import wraps
 from pathlib import Path
 
 from flask import Blueprint, abort, g, jsonify, redirect, render_template, request, session, url_for
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
@@ -27,8 +28,9 @@ bp = Blueprint("auth", __name__)
 DOSSIER_FONDS = Path(__file__).resolve().parent / "static" / "fonds"
 EXTENSIONS_IMAGE = (".jpg", ".jpeg", ".png", ".webp", ".avif")
 LONGUEUR_MIN_MDP = 10
-ECHECS_MAX, VERROU_SECONDES = 5, 300
-_echecs: dict[str, list[float]] = {}
+ECHECS_MAX_ADRESSE, VERROU_ADRESSE = 5, timedelta(minutes=5)
+ECHECS_MAX_IDENTIFIANT, VERROU_IDENTIFIANT = 10, timedelta(minutes=15)
+CONSERVATION_ECHECS = timedelta(days=1)
 
 
 def mode_demo() -> bool:
@@ -86,7 +88,46 @@ def utilisateur_courant() -> dict | None:
 
 
 def _adresse() -> str:
-    return request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
+    """Adresse du visiteur. Derriere un proxy (Render, Nginx), ProxyFix la reprend de X-Forwarded-For, mais
+    seulement pour le nombre de proxys declares (PROXYS_DE_CONFIANCE) : un visiteur ne peut pas la falsifier."""
+    return (request.remote_addr or "?")[:60]
+
+
+def proxys_de_confiance() -> int:
+    valeur = os.environ.get("PROXYS_DE_CONFIANCE", "").strip()
+    if valeur.isdigit():
+        return int(valeur)
+    return 1 if os.environ.get("RENDER") else 0  # Render place un proxy devant l'application
+
+
+# ------------------------------------------------------------------ verrouillage apres echecs
+def _identifiant_normalise(identifiant: str) -> str:
+    return (identifiant or "").strip().lower()[:80]
+
+
+def connexion_bloquee(c, adresse: str, identifiant: str) -> bool:
+    t, instant = db.echec_connexion, db.maintenant()
+    par_adresse = c.execute(select(func.count()).select_from(t).where(
+        t.c.adresse == adresse, t.c.cree_le > instant - VERROU_ADRESSE)).scalar()
+    if par_adresse >= ECHECS_MAX_ADRESSE:
+        return True
+    ident = _identifiant_normalise(identifiant)
+    if not ident:
+        return False
+    par_identifiant = c.execute(select(func.count()).select_from(t).where(
+        t.c.identifiant == ident, t.c.cree_le > instant - VERROU_IDENTIFIANT)).scalar()
+    return par_identifiant >= ECHECS_MAX_IDENTIFIANT
+
+
+def noter_echec(c, adresse: str, identifiant: str) -> None:
+    t, instant = db.echec_connexion, db.maintenant()
+    c.execute(t.insert().values(adresse=adresse, identifiant=_identifiant_normalise(identifiant) or None, cree_le=instant))
+    c.execute(t.delete().where(t.c.cree_le < instant - CONSERVATION_ECHECS))
+
+
+def effacer_echecs(c, adresse: str, identifiant: str) -> None:
+    t = db.echec_connexion
+    c.execute(t.delete().where(or_(t.c.adresse == adresse, t.c.identifiant == _identifiant_normalise(identifiant))))
 
 
 def charger_utilisateur():
@@ -113,6 +154,8 @@ def jeton_csrf() -> str:
 def verifier_csrf():
     if request.method in ("GET", "HEAD", "OPTIONS") or request.endpoint in ("auth.connexion", "static"):
         return
+    if request.endpoint == "raccordement.synchroniser":
+        return  # authentifie par jeton de service, sans session ni cookie : pas de CSRF possible
     if utilisateur_courant() is None:
         return  # sans session, rien a proteger : la vue repondra « reconnectez-vous »
     envoye = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
@@ -172,10 +215,12 @@ def connexion():
     erreur = None
     if request.method == "POST":
         adresse = _adresse()
-        recents = [t for t in _echecs.get(adresse, []) if time.time() - t < VERROU_SECONDES]
-        _echecs[adresse] = recents
         identifiant = request.form.get("identifiant", "").strip()
-        if len(recents) >= ECHECS_MAX:
+        with db.connexion() as c:
+            bloquee = connexion_bloquee(c, adresse, identifiant)
+            if bloquee:
+                tracer(c, None, "connexion_bloquee", detail={"identifiant": identifiant[:80]})
+        if bloquee:
             erreur = "Trop de tentatives. Réessayez dans quelques minutes."
         else:
             with db.connexion() as c:
@@ -186,13 +231,13 @@ def connexion():
                     session.permanent = True
                     c.execute(db.utilisateur.update().where(db.utilisateur.c.id == u["id"]).values(derniere_connexion=db.maintenant()))
                     tracer(c, u, "connexion")
-                    _echecs.pop(adresse, None)
+                    effacer_echecs(c, adresse, identifiant)
                     suivant = request.args.get("suivant", "")
                     if u["doit_changer_mdp"]:
                         return redirect(url_for("auth.compte"))
                     return redirect(suivant if suivant.startswith("/") and not suivant.startswith("//") else page_d_accueil(u))
                 tracer(c, None, "echec_connexion", detail={"identifiant": identifiant[:80]})
-            _echecs.setdefault(adresse, []).append(time.time())
+                noter_echec(c, adresse, identifiant)
             erreur = "Identifiant ou mot de passe incorrect."
     fond = image_de_fond()
     from metier.demo import COMPTES_DEMO, MOT_DE_PASSE_DEMO

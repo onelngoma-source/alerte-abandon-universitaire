@@ -36,6 +36,8 @@ def page(serveur):
         pg = navigateur.new_page(viewport={"width": 1440, "height": 900})
         erreurs = []
         pg.on("pageerror", lambda e: erreurs.append(str(e)))
+        # un script bloque par la politique de contenu (CSP) ferait echouer le test
+        pg.on("console", lambda m: erreurs.append(m.text) if m.type == "error" and "Content Security Policy" in m.text else None)
         pg.goto(serveur + "/connexion")
         pg.fill("#identifiant", "admin"); pg.fill("#mot_de_passe", "changez-moi")
         pg.click("button[type=submit]"); pg.wait_for_load_state("networkidle")
@@ -55,11 +57,11 @@ def test_demarrage_vide_puis_chargement_du_jeu_de_test(page):
     pg.goto(serveur + "/tableau")
     assert pg.is_visible("#etat-vide")
     charger(pg, serveur)
-    pg.wait_for_function("document.querySelector('#kpi-effectif').innerText.replace(/\\s/g, '') === '1227'")
+    pg.wait_for_function("() => document.querySelector('#kpi-effectif').innerText.replace(/\\s/g, '') === '1227'")
     assert pg.locator("#lignes tr[data-id]").count() == 60
     # les lignes suivantes arrivent quand on approche du bas de la liste
     pg.locator("#lignes .sentinelle").scroll_into_view_if_needed()
-    pg.wait_for_function("document.querySelectorAll('#lignes tr[data-id]').length > 60")
+    pg.wait_for_function("() => document.querySelectorAll('#lignes tr[data-id]').length > 60")
 
 
 def test_la_file_est_classee_par_risque_et_suit_la_capacite(page):
@@ -96,9 +98,9 @@ def test_un_clic_ouvre_l_apercu_puis_la_fiche_en_onglets(page):
     assert pg.locator("#tiroir .facteurs.hausse li").count() >= 1
     # fleche bas : etudiant suivant de la liste, sans quitter la page
     pg.keyboard.press("ArrowDown")
-    pg.wait_for_function(f"document.querySelector('#tiroir-titre').innerText === {deuxieme!r}")
+    pg.wait_for_function(f"() => document.querySelector('#tiroir-titre').innerText === {deuxieme!r}")
     pg.keyboard.press("ArrowUp")
-    pg.wait_for_function(f"document.querySelector('#tiroir-titre').innerText === {premier!r}")
+    pg.wait_for_function(f"() => document.querySelector('#tiroir-titre').innerText === {premier!r}")
     pg.click("#tiroir-fiche")
     pg.wait_for_selector("#ruban-fiche")
     assert pg.inner_text("h1") == premier
@@ -111,7 +113,7 @@ def test_un_clic_ouvre_l_apercu_puis_la_fiche_en_onglets(page):
     pg.click("[data-onglet=evolution]")
     assert pg.locator(".trajectoire .etape-traj").count() == 3
     pg.click("#suivant")
-    pg.wait_for_function(f"document.querySelector('h1').innerText !== {premier!r}")
+    pg.wait_for_function(f"() => document.querySelector('h1').innerText !== {premier!r}")
     pg.wait_for_selector("#ruban-fiche")
     assert pg.inner_text("h1") == deuxieme
 
@@ -123,7 +125,7 @@ def test_la_saisie_estime_en_direct(page):
     pg.wait_for_selector("#resultat .risque-grand")
     assert "fin du 2e semestre" in pg.inner_text("#resultat .meta-risque")
     pg.uncheck("[data-bascule='1st']")
-    pg.wait_for_function("document.querySelector('#resultat .meta-risque').innerText.includes(\"l'inscription\")")
+    pg.wait_for_function("() => document.querySelector('#resultat .meta-risque').innerText.includes(\"l'inscription\")")
     assert pg.locator("#resultat .etape-traj.future").count() == 2
 
 

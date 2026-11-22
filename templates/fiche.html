@@ -38,10 +38,10 @@
 {% endblock %}
 
 {% block scripts %}
-<script>window.UTILISATEUR_ID = {{ utilisateur.id }};</script>
+<script nonce="{{ csp_nonce }}">window.UTILISATEUR_ID = {{ utilisateur.id }};</script>
 <script src="{{ url_for('static', filename='js/fiche.js') }}"></script>
 <script src="{{ url_for('static', filename='js/suivi.js') }}"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   const id = {{ etudiant_id }};
   const cohorte = {{ cohorte.id }};

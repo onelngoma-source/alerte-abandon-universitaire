@@ -12,7 +12,7 @@ def tracer(c, utilisateur: dict | None, action: str, objet: str | None = None, o
         detail = json.dumps(detail, ensure_ascii=False)
     adresse = None
     if has_request_context():
-        adresse = (request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip() or None)
+        adresse = (request.remote_addr or "")[:60] or None  # reprise de X-Forwarded-For par ProxyFix (voir auth.py)
     c.execute(db.journal.insert().values(
         utilisateur_id=utilisateur["id"] if utilisateur else None,
         identifiant=utilisateur["identifiant"] if utilisateur else None,

@@ -1,6 +1,8 @@
 # Versions figees : les modeles sont serialises avec ces versions precises
 # (les memes que le projet de recherche github.com/onelngoma-source/abandon-universitaire).
 # Changer scikit-learn ou numpy peut rendre le fichier models/modeles.joblib illisible.
+alembic==1.19.2
+cryptography==50.0.1
 flask==3.1.3
 gunicorn==23.0.0
 joblib==1.6.0

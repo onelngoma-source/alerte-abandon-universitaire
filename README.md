@@ -9,6 +9,8 @@ La version présentée lors de la soutenance est conservée dans l'historique Gi
 **Pour un établissement qui veut l'utiliser : lire d'abord [GUIDE_MISE_EN_SERVICE.md](GUIDE_MISE_EN_SERVICE.md)**
 (organisation, cadre légal au Gabon, installation, calendrier annuel, validation du modèle sur l'établissement,
 mention d'information et charte d'usage).
+**Pour la direction informatique qui reprend l'outil : [docs/PASSATION.md](docs/PASSATION.md)** (carte du code, mises à
+jour et migrations, sauvegardes vérifiées, raccordement au logiciel de scolarité, gestes de secours, ce que prouvent les tests).
 
 ## Le principe
 

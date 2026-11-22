@@ -105,9 +105,10 @@ Toujours dans la création du service, section **Environment Variables**, ajoute
 | `ADMIN_IDENTIFIANT` | `jury` |
 | `ADMIN_MDP_HACHE` | l'empreinte `scrypt:` de l'étape 3 |
 
-**Sans `FLASK_SECRET_KEY`, une clé au hasard est tirée à chaque démarrage.** Comme c'est elle qui signe
-les cookies de session, tous les jurés seraient déconnectés à chaque redémarrage, et chacun perdrait
-l'accès à la cohorte qu'il venait d'importer.
+**Gardez `FLASK_SECRET_KEY`.** C'est elle qui signe les cookies de session. Sans elle, l'application tire
+une clé une fois et la garde dans sa base ; mais sur l'offre gratuite de Render la base SQLite repart de zéro
+à chaque redéploiement, et tous les jurés seraient alors déconnectés. Sur Render, l'adresse réelle des
+visiteurs est reprise automatiquement derrière le proxy de l'hébergeur (`PROXYS_DE_CONFIANCE` vaut 1 par défaut).
 
 Puis **Create Web Service**. La première construction prend cinq à dix minutes.
 

@@ -25,5 +25,5 @@
   <div class="actions" style="justify-content:flex-end"><button class="btn btn-plein" type="button" id="fermer-mdp">C'est noté</button></div>
 </div></dialog>
 {% endblock %}
-{% block scripts %}<script>window.MOI = {{ utilisateur.id }}; window.DEMO = {{ 'true' if mode_demo else 'false' }};</script>
+{% block scripts %}<script nonce="{{ csp_nonce }}">window.MOI = {{ utilisateur.id }}; window.DEMO = {{ 'true' if mode_demo else 'false' }};</script>
 <script src="{{ url_for('static', filename='js/admin.js') }}"></script>{% endblock %}

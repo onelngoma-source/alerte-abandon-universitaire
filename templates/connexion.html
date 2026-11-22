@@ -114,7 +114,7 @@
               {% endfor %}
             </div>
           </div>
-          <script>
+          <script nonce="{{ csp_nonce }}">
             document.querySelectorAll('[data-compte]').forEach(function (b) {
               b.addEventListener('click', function () {
                 document.getElementById('identifiant').value = b.dataset.compte;

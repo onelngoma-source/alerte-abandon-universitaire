@@ -101,12 +101,12 @@
 {% endblock %}
 
 {% block scripts %}
-<script>window.UTILISATEUR_ID = {{ utilisateur.id }};</script>
+<script nonce="{{ csp_nonce }}">window.UTILISATEUR_ID = {{ utilisateur.id }};</script>
 <script src="{{ url_for('static', filename='js/fiche.js') }}"></script>
 <script src="{{ url_for('static', filename='js/suivi.js') }}"></script>
 <script src="{{ url_for('static', filename='js/apercu.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cohorte.js') }}"></script>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   const courante = {{ courante if courante else 'null' }};
   const choix = document.getElementById('choix-cohorte');

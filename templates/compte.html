@@ -18,7 +18,7 @@
   </form></section>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 document.getElementById('form-mdp').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target, err = document.getElementById('erreur');

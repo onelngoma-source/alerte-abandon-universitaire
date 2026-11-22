@@ -16,15 +16,43 @@
   <div><dt>Base de données</dt><dd>{{ 'PostgreSQL' if base.startswith('postgresql') else 'SQLite' }}</dd></div>
   <div><dt>Seuil d'alerte</dt><dd>1 sur 6 (16,7 %)</dd></div>
   <div><dt>Mode</dt><dd>{{ 'Démonstration' if mode_demo else 'Établissement' }}</dd></div>
+  <div><dt>Schéma de la base</dt><dd>{{ revision or '–' }}</dd></div>
+  <div><dt>Dernière sauvegarde</dt><dd id="sauvegarde">–</dd></div>
 </dl></div></section>
+<section class="carte" style="margin-top:16px"><div class="carte-tete"><h2>Raccordement au système de scolarité</h2></div>
+  <div class="carte-corps">
+    <p class="texte-court">Le logiciel de scolarité peut envoyer lui-même le fichier d'une promotion, sans import manuel, avec un
+      jeton de service. Un jeton n'est affiché qu'une fois ; seule son empreinte est conservée. Révoquez-le dès qu'il n'est plus utilisé.</p>
+    <form class="actions" id="form-jeton" style="margin:12px 0">
+      <input class="champ" name="nom" placeholder="Nom du jeton, par exemple « Logiciel de scolarité »" style="flex:1 1 260px" maxlength="120" {{ 'disabled' if mode_demo }}>
+      <button class="btn btn-plein" type="submit" {{ 'disabled' if mode_demo }}>Créer un jeton</button>
+    </form>
+    <div class="tableau-wrap"><table class="simple" style="width:100%"><thead><tr><th style="text-align:left">Jeton</th><th style="text-align:left">Créé</th>
+      <th style="text-align:left">Dernier usage</th><th style="text-align:left">État</th><th></th></tr></thead><tbody id="jetons"></tbody></table></div>
+  </div></section>
+<dialog class="modale" id="modale-jeton"><div class="carte-corps">
+  <h2>Nouveau jeton de service</h2>
+  <p class="texte-court">Copiez-le maintenant dans la configuration du logiciel de scolarité : il ne sera plus jamais affiché.</p>
+  <div class="mdp-provisoire" id="jeton" style="font-size:14px;word-break:break-all"></div>
+  <p class="texte-court">Exemple d'envoi :<br><code id="exemple-jeton" style="font-size:12px;word-break:break-all"></code></p>
+  <div class="actions" style="justify-content:flex-end"><button class="btn btn-plein" type="button" id="fermer-jeton">C'est noté</button></div>
+</div></dialog>
 {% endblock %}
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   const { echapper, api, date, nombre, notifier } = Commun;
   const NOMS = { utilisateur: 'Comptes', promotion: 'Promotions', etudiant: 'Étudiants', evaluation: 'Estimations', dossier: 'Dossiers', action: 'Actions de suivi', journal: 'Entrées du journal' };
+  function sauvegarde(s) {
+    if (!s) return '<span class="etiquette alerte">Aucune sauvegarde enregistrée</span>';
+    const heures = (Date.now() - new Date(s.cree_le)) / 36e5;
+    const etat = !s.verifiee ? '<span class="etiquette attention">non vérifiée</span>'
+      : heures > 26 ? '<span class="etiquette alerte">plus de 24 h</span>' : '<span class="etiquette">vérifiée</span>';
+    return `${Commun.dateHeure(s.cree_le)} · ${nombre(s.lignes)} lignes${s.chiffree ? ', chiffrée' : ''} ${etat}`;
+  }
   async function charger() {
     const d = await api('/api/admin/donnees');
+    document.getElementById('sauvegarde').innerHTML = sauvegarde(d.sauvegarde);
     document.getElementById('totaux').innerHTML = ['etudiant', 'evaluation', 'dossier', 'journal'].map((k) =>
       `<div class="carte indicateur"><div class="libelle">${NOMS[k]}</div><div class="valeur tnum">${nombre(d.totaux[k])}</div></div>`).join('');
     document.getElementById('promotions').innerHTML = d.promotions.map((p) => `<tr style="cursor:default">
@@ -42,7 +70,41 @@
     try { const r = await api('/api/admin/purge', { promotions: ids }); notifier(r.supprimees.length + ' promotion(s) purgée(s).'); charger(); }
     catch (e) { notifier(e.message, 'erreur'); }
   });
+  async function jetons() {
+    const d = await api('/api/admin/jetons');
+    document.getElementById('jetons').innerHTML = d.jetons.length ? d.jetons.map((j) => `<tr>
+      <td style="text-align:left"><b>${echapper(j.nom)}</b><br><code class="petit">${echapper(j.prefixe)}…</code></td>
+      <td style="text-align:left">${Commun.date(j.cree_le)}${j.cree_par ? '<br><span class="discret petit">' + echapper(j.cree_par) + '</span>' : ''}</td>
+      <td style="text-align:left">${j.derniere_utilisation ? Commun.dateHeure(j.derniere_utilisation) : '<span class="discret">jamais</span>'}</td>
+      <td style="text-align:left">${j.revoque_le ? '<span class="etiquette">révoqué</span>' : '<span class="etiquette or">actif</span>'}</td>
+      <td>${j.revoque_le ? '' : `<button class="btn btn-petit" data-revoquer="${j.id}">Révoquer</button>`}</td></tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:left" class="discret">Aucun jeton : les imports se font à la main (page Importer).</td></tr>';
+  }
+  document.getElementById('form-jeton').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const champ = e.target.elements.nom;
+    try {
+      const r = await api('/api/admin/jetons', { nom: champ.value });
+      champ.value = '';
+      document.getElementById('jeton').textContent = r.jeton;
+      document.getElementById('exemple-jeton').textContent =
+        `curl -H "Authorization: Bearer ${r.jeton}" -F promotion="Licence 1 2026-2027" -F fichier=@l1.csv ${location.origin}/api/v1/synchronisation`;
+      document.getElementById('modale-jeton').showModal();
+      jetons();
+    } catch (err) { notifier(err.message, 'erreur'); }
+  });
+  document.getElementById('fermer-jeton').addEventListener('click', () => {
+    document.getElementById('jeton').textContent = '';
+    document.getElementById('modale-jeton').close();
+  });
+  document.getElementById('jetons').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-revoquer]');
+    if (!b) return;
+    try { await api(`/api/admin/jetons/${b.dataset.revoquer}/revocation`, {}); notifier('Jeton révoqué : il ne permet plus aucun import.'); jetons(); }
+    catch (err) { notifier(err.message, 'erreur'); }
+  });
   charger();
+  jetons();
 })();
 </script>
 {% endblock %}
